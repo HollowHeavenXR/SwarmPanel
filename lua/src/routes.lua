@@ -72,7 +72,7 @@ function M.register(cfg)
     if device then return settings.device_token_ttl_seconds or 2592000 end
     return settings.api_token_ttl_seconds
   end
-  local KNOWN_CLIENTS = { web = true, ios = true, tvos = true, widget = true }
+  local KNOWN_CLIENTS = { web = true, ios = true, tvos = true, widget = true, linux = true }
   local function client_name(value)
     local c = tostring(value or ""):lower()
     return KNOWN_CLIENTS[c] and c or nil
