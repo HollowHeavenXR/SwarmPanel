@@ -3258,7 +3258,7 @@ function M.register(cfg)
   -- work in this file, so a slow GitHub fetch yields instead of blocking
   -- the single-threaded server.
   -- ---------------------------------------------------------------------
-  local LUMISOUND_REPO = "HeavenlyXenusVR/Lumisound"
+  local LUMISOUND_REPO = "HollowHeavenXR/Lumisound"
   local LUMISOUND_POLL_SECONDS = 20
   local LUMISOUND_CACHE_DIR = "./.runtime/project_downloads"
 

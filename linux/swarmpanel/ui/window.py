@@ -446,14 +446,14 @@ class MainWindow(Adw.ApplicationWindow):
         about = Adw.AboutDialog(
             application_name="SwarmPanel",
             application_icon="studio.xenusanimations.SwarmPanel",
-            developer_name="HeavenlyXenusVR",
+            developer_name="HollowHeavenXR",
             version="1.0.0",
             comments=(
                 "Native Linux client for SwarmPanel — the command centre for "
                 "Aria and the music bot fleet."
             ),
             website="https://swarmpanel.xenusanimations.studio",
-            copyright="© HeavenlyXenusVR",
+            copyright="© HollowHeavenXR",
         )
         about.add_credit_section("Backend", ["Lua panel + FastAPI services"])
         about.present(self)

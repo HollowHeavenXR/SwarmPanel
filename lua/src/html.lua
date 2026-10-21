@@ -427,7 +427,7 @@ function M.layout(opts)
 </div>
 %s
 <footer class="site-footer">
-  <span>SwarmPanel // HeavenlyXenusVR</span>
+  <span>SwarmPanel // HollowHeavenXR</span>
   <a href="https://discord.com/users/1304564041863266347" target="_blank" rel="noreferrer">Discord</a>
 </footer>
 </div>

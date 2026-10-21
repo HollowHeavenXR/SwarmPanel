@@ -1,13 +1,13 @@
 {
   "name": "SwarmPanel",
   "identifier": "com.swarmpanel.altstore-source",
-  "sourceURL": "https://raw.githubusercontent.com/HeavenlyXenusVR/SwarmPanel/main/ios/altstore-source.json",
+  "sourceURL": "https://raw.githubusercontent.com/HollowHeavenXR/SwarmPanel/main/ios/altstore-source.json",
   "news": [],
   "apps": [
     {
       "name": "SwarmPanel",
       "bundleIdentifier": "com.swarmpanel.ios",
-      "developerName": "HeavenlyXenusVR",
+      "developerName": "HollowHeavenXR",
       "subtitle": "Fleet command companion for the Discord music bot swarm",
       "localizedDescription": "SwarmPanel is the iOS companion to the SwarmPanel web admin panel: live fleet dashboard, direct playback controls, guild leaderboards, notifications, and social features for the Discord music bot fleet.",
       "iconURL": "",
@@ -21,7 +21,7 @@
         {
           "version": "0.17.0",
           "date": "2026-10-04T03:01:47Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.17.0/SwarmPanel-0.17.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.17.0/SwarmPanel-0.17.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1522957,
           "minOSVersion": "16.0"
@@ -29,7 +29,7 @@
         {
           "version": "0.16.0",
           "date": "2026-10-03T19:38:12Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.16.0/SwarmPanel-0.16.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.16.0/SwarmPanel-0.16.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1358456,
           "minOSVersion": "16.0"
@@ -37,7 +37,7 @@
         {
           "version": "0.15.1",
           "date": "2026-09-30T01:34:54Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.15.1/SwarmPanel-0.15.1-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.15.1/SwarmPanel-0.15.1-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1338435,
           "minOSVersion": "16.0"
@@ -45,7 +45,7 @@
         {
           "version": "0.15.0",
           "date": "2026-09-30T00:34:53Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.15.0/SwarmPanel-0.15.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.15.0/SwarmPanel-0.15.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1338436,
           "minOSVersion": "16.0"
@@ -53,7 +53,7 @@
         {
           "version": "0.14.0",
           "date": "2026-08-30T01:41:45Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.14.0/SwarmPanel-0.14.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.14.0/SwarmPanel-0.14.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1290831,
           "minOSVersion": "16.0"
@@ -61,7 +61,7 @@
         {
           "version": "0.13.0",
           "date": "2026-08-29T20:37:14Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.13.0/SwarmPanel-0.13.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.13.0/SwarmPanel-0.13.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1282315,
           "minOSVersion": "16.0"
@@ -69,7 +69,7 @@
         {
           "version": "0.12.9",
           "date": "2026-08-29T18:28:00Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.9/SwarmPanel-0.12.9-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.9/SwarmPanel-0.12.9-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1128290,
           "minOSVersion": "16.0"
@@ -77,7 +77,7 @@
         {
           "version": "0.12.8",
           "date": "2026-08-10T07:00:18Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.8/SwarmPanel-0.12.8-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.8/SwarmPanel-0.12.8-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1128106,
           "minOSVersion": "16.0"
@@ -85,7 +85,7 @@
         {
           "version": "0.12.7",
           "date": "2026-08-10T06:56:51Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.7/SwarmPanel-0.12.7-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.7/SwarmPanel-0.12.7-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1113168,
           "minOSVersion": "16.0"
@@ -93,7 +93,7 @@
         {
           "version": "0.12.6",
           "date": "2026-08-10T06:40:31Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.6/SwarmPanel-0.12.6-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.6/SwarmPanel-0.12.6-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1087025,
           "minOSVersion": "16.0"
@@ -101,7 +101,7 @@
         {
           "version": "0.12.5",
           "date": "2026-08-10T06:32:03Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.5/SwarmPanel-0.12.5-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.5/SwarmPanel-0.12.5-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1088724,
           "minOSVersion": "16.0"
@@ -109,7 +109,7 @@
         {
           "version": "0.12.4",
           "date": "2026-08-10T06:27:23Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.4/SwarmPanel-0.12.4-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.4/SwarmPanel-0.12.4-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1086764,
           "minOSVersion": "16.0"
@@ -117,7 +117,7 @@
         {
           "version": "0.12.3",
           "date": "2026-08-10T06:22:25Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.3/SwarmPanel-0.12.3-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.3/SwarmPanel-0.12.3-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1083613,
           "minOSVersion": "16.0"
@@ -125,7 +125,7 @@
         {
           "version": "0.12.2",
           "date": "2026-08-10T06:00:32Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.2/SwarmPanel-0.12.2-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.2/SwarmPanel-0.12.2-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1078268,
           "minOSVersion": "16.0"
@@ -133,7 +133,7 @@
         {
           "version": "0.12.1",
           "date": "2026-08-10T02:52:31Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.1/SwarmPanel-0.12.1-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.1/SwarmPanel-0.12.1-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1074986,
           "minOSVersion": "16.0"
@@ -141,7 +141,7 @@
         {
           "version": "0.12.0",
           "date": "2026-08-10T02:42:41Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.12.0/SwarmPanel-0.12.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.12.0/SwarmPanel-0.12.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1072429,
           "minOSVersion": "16.0"
@@ -149,7 +149,7 @@
         {
           "version": "0.11.6",
           "date": "2026-08-10T02:18:34Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.11.6/SwarmPanel-0.11.6-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.11.6/SwarmPanel-0.11.6-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1068566,
           "minOSVersion": "16.0"
@@ -157,7 +157,7 @@
         {
           "version": "0.11.5",
           "date": "2026-08-10T01:57:03Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.11.5/SwarmPanel-0.11.5-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.11.5/SwarmPanel-0.11.5-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1067807,
           "minOSVersion": "16.0"
@@ -165,7 +165,7 @@
         {
           "version": "0.11.4",
           "date": "2026-08-10T01:49:08Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.11.4/SwarmPanel-0.11.4-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.11.4/SwarmPanel-0.11.4-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1065969,
           "minOSVersion": "16.0"
@@ -173,7 +173,7 @@
         {
           "version": "0.11.3",
           "date": "2026-08-10T01:40:37Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.11.3/SwarmPanel-0.11.3-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.11.3/SwarmPanel-0.11.3-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1064124,
           "minOSVersion": "16.0"
@@ -181,7 +181,7 @@
         {
           "version": "0.11.2",
           "date": "2026-08-10T01:13:31Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.11.2/SwarmPanel-0.11.2-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.11.2/SwarmPanel-0.11.2-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1064220,
           "minOSVersion": "16.0"
@@ -189,7 +189,7 @@
         {
           "version": "0.11.1",
           "date": "2026-08-10T01:07:08Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.11.1/SwarmPanel-0.11.1-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.11.1/SwarmPanel-0.11.1-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1064237,
           "minOSVersion": "16.0"
@@ -197,7 +197,7 @@
         {
           "version": "0.11.0",
           "date": "2026-08-10T00:58:33Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.11.0/SwarmPanel-0.11.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.11.0/SwarmPanel-0.11.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1058098,
           "minOSVersion": "16.0"
@@ -205,7 +205,7 @@
         {
           "version": "0.10.2",
           "date": "2026-08-03T02:20:12Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.10.2/SwarmPanel-0.10.2-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.10.2/SwarmPanel-0.10.2-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1042931,
           "minOSVersion": "16.0"
@@ -213,7 +213,7 @@
         {
           "version": "0.10.1",
           "date": "2026-08-01T18:46:35Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.10.1/SwarmPanel-0.10.1-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.10.1/SwarmPanel-0.10.1-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1041641,
           "minOSVersion": "16.0"
@@ -221,7 +221,7 @@
         {
           "version": "0.10.0",
           "date": "2026-08-01T17:44:15Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.10.0/SwarmPanel-0.10.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.10.0/SwarmPanel-0.10.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 1039086,
           "minOSVersion": "16.0"
@@ -229,7 +229,7 @@
         {
           "version": "0.9.2",
           "date": "2026-07-19T17:22:42Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.9.2/SwarmPanel-0.9.2-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.9.2/SwarmPanel-0.9.2-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 963945,
           "minOSVersion": "16.0"
@@ -237,7 +237,7 @@
         {
           "version": "0.9.1",
           "date": "2026-07-19T17:10:30Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.9.1/SwarmPanel-0.9.1-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.9.1/SwarmPanel-0.9.1-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 963299,
           "minOSVersion": "16.0"
@@ -245,7 +245,7 @@
         {
           "version": "0.9.0",
           "date": "2026-07-19T15:59:09Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.9.0/SwarmPanel-0.9.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.9.0/SwarmPanel-0.9.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 962930,
           "minOSVersion": "16.0"
@@ -253,7 +253,7 @@
         {
           "version": "0.8.0",
           "date": "2026-07-18T01:28:44Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.8.0/SwarmPanel-0.8.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.8.0/SwarmPanel-0.8.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 884341,
           "minOSVersion": "16.0"
@@ -261,7 +261,7 @@
         {
           "version": "0.7.5",
           "date": "2026-07-18T01:03:19Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.7.5/SwarmPanel-0.7.5-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.7.5/SwarmPanel-0.7.5-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 785501,
           "minOSVersion": "16.0"
@@ -269,7 +269,7 @@
         {
           "version": "0.7.4",
           "date": "2026-07-17T21:23:53Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.7.4/SwarmPanel-0.7.4-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.7.4/SwarmPanel-0.7.4-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 765723,
           "minOSVersion": "16.0"
@@ -277,7 +277,7 @@
         {
           "version": "0.7.3",
           "date": "2026-07-17T20:49:14Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.7.3/SwarmPanel-0.7.3-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.7.3/SwarmPanel-0.7.3-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 729577,
           "minOSVersion": "16.0"
@@ -285,7 +285,7 @@
         {
           "version": "0.7.2",
           "date": "2026-07-17T20:37:52Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.7.2/SwarmPanel-0.7.2-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.7.2/SwarmPanel-0.7.2-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 730042,
           "minOSVersion": "16.0"
@@ -293,7 +293,7 @@
         {
           "version": "0.7.1",
           "date": "2026-07-17T19:58:10Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.7.1/SwarmPanel-0.7.1-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.7.1/SwarmPanel-0.7.1-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 722510,
           "minOSVersion": "16.0"
@@ -301,7 +301,7 @@
         {
           "version": "0.7.0",
           "date": "2026-07-14T01:35:29Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.7.0/SwarmPanel-0.7.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.7.0/SwarmPanel-0.7.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 716440,
           "minOSVersion": "16.0"
@@ -309,7 +309,7 @@
         {
           "version": "0.6.3",
           "date": "2026-07-14T01:25:30Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.6.3/SwarmPanel-0.6.3-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.6.3/SwarmPanel-0.6.3-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 707533,
           "minOSVersion": "16.0"
@@ -317,7 +317,7 @@
         {
           "version": "0.6.2",
           "date": "2026-07-14T01:12:53Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.6.2/SwarmPanel-0.6.2-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.6.2/SwarmPanel-0.6.2-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 708345,
           "minOSVersion": "16.0"
@@ -325,7 +325,7 @@
         {
           "version": "0.6.1",
           "date": "2026-07-14T01:06:39Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.6.1/SwarmPanel-0.6.1-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.6.1/SwarmPanel-0.6.1-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 701093,
           "minOSVersion": "16.0"
@@ -333,7 +333,7 @@
         {
           "version": "0.6.0",
           "date": "2026-07-14T00:48:11Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.6.0/SwarmPanel-0.6.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.6.0/SwarmPanel-0.6.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 705006,
           "minOSVersion": "16.0"
@@ -341,7 +341,7 @@
         {
           "version": "0.5.0",
           "date": "2026-07-14T00:18:40Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.5.0/SwarmPanel-0.5.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.5.0/SwarmPanel-0.5.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 658548,
           "minOSVersion": "16.0"
@@ -349,7 +349,7 @@
         {
           "version": "0.4.0",
           "date": "2026-07-14T00:06:55Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.4.0/SwarmPanel-0.4.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.4.0/SwarmPanel-0.4.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 641177,
           "minOSVersion": "16.0"
@@ -357,7 +357,7 @@
         {
           "version": "0.3.0",
           "date": "2026-07-13T23:52:47Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.3.0/SwarmPanel-0.3.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.3.0/SwarmPanel-0.3.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 583821,
           "minOSVersion": "16.0"
@@ -365,7 +365,7 @@
         {
           "version": "0.2.0",
           "date": "2026-07-13T19:15:20Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.2.0/SwarmPanel-0.2.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.2.0/SwarmPanel-0.2.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 346914,
           "minOSVersion": "16.0"
@@ -373,7 +373,7 @@
         {
           "version": "0.1.0",
           "date": "2026-07-13T15:07:01Z",
-          "downloadURL": "https://github.com/HeavenlyXenusVR/SwarmPanel/releases/download/ios%2Fv0.1.0/SwarmPanel-0.1.0-unsigned.ipa",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.1.0/SwarmPanel-0.1.0-unsigned.ipa",
           "localizedDescription": "See release notes on GitHub.",
           "size": 309153,
           "minOSVersion": "16.0"

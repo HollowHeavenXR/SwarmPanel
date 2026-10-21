@@ -9,7 +9,7 @@ description = "Native Linux client for SwarmPanel — the command centre for Ari
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary" }
-authors = [{ name = "HeavenlyXenusVR" }]
+authors = [{ name = "HollowHeavenXR" }]
 dependencies = ["PyGObject>=3.46", "websockets>=12"]
 
 [project.scripts]

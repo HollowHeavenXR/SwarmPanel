@@ -1,11 +1,11 @@
 # SwarmPanel Telegram Owner Routing Patch
 
 ## Goal
-Harden the Telegram bridge and route SwarmPanel Telegram updates to the owner account `@HeavenlyXenusVR`.
+Harden the Telegram bridge and route SwarmPanel Telegram updates to the owner account `@HollowHeavenXR`.
 
 ## Changes
 
-- Added `PANEL_TELEGRAM_ALLOWED_USERNAMES=@HeavenlyXenusVR` to `.env` and `.env.example`.
+- Added `PANEL_TELEGRAM_ALLOWED_USERNAMES=@HollowHeavenXR` to `.env` and `.env.example`.
 - Added username-based authorization in `app/telegram.py`.
 - Added runtime learning of the real numeric Telegram chat ID after the allowed account sends the bot any message such as `/start` or `/id`.
 - Learned recipients are stored in `.runtime/telegram_recipients.json`.
@@ -21,7 +21,7 @@ Telegram bots generally cannot reliably start a private DM to a user account by 
 
 ## Owner setup
 
-1. Open Telegram as `@HeavenlyXenusVR`.
+1. Open Telegram as `@HollowHeavenXR`.
 2. Open the SwarmPanel bot.
 3. Send `/start` or `/id`.
 4. Restart SwarmPanel once if it was already running before this patch.
