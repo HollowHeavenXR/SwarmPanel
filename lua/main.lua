@@ -10,6 +10,7 @@ local page_modules = {
   require("pages_auth"),
   require("pages_fleet"),
   require("pages_insights"),
+  require("pages_telemetry"),
   require("pages_community"),
   require("pages_account"),
   require("pages_admin"),

@@ -60,6 +60,7 @@ M.SECTIONS = {
       { to = "/admin", label = "Overview", glyph = "⚙", when = "staff", blurb = "Every admin tool in one place." },
       { to = "/diagnostics", label = "Diagnostics", glyph = "♥", when = "admin", blurb = "Stability, metrics, alert rules, and exports." },
       { to = "/intel", label = "Intel", glyph = "⚠", when = "admin", blurb = "Trends, anomalies, and raw events." },
+      { to = "/bot-telemetry", label = "Bot Telemetry", glyph = "📡", when = "admin", blurb = "Raw diagnostic events from a single bot's own database." },
       { to = "/audit-log", label = "Audit Log", glyph = "☰", when = "mod", blurb = "Every recorded admin action." },
       { to = "/accounts", label = "Accounts", glyph = "☺", when = "admin", blurb = "Recover and manage swarm accounts." },
       { to = "/databases", label = "Databases", glyph = "▤", when = "admin", blurb = "Browse raw schema tables." },

@@ -2713,6 +2713,38 @@ function M.register(cfg)
     return 200, { ok = true, data = result }
   end)
 
+  -- ------------------------------------------------------- bot-telemetry
+  -- Raw per-event stream from a single bot's own <bot>_telemetry_events
+  -- table (see pages_telemetry.lua's header comment for how this differs
+  -- from telemetry.lua's panel-usage tracking and /intel's fleet-wide
+  -- aggregate trends). Admin/moderator-only -- this is internal
+  -- diagnostic detail, not something a guild-scoped account needs.
+  httpd.route("GET", "/api/bot-telemetry", function(req)
+    local a, status, err_body = require_admin_or_moderator(req)
+    if not a then return status, err_body end
+    local bot_key = req.query.bot_key
+    local bot = bot_key and bot_index[bot_key]
+    if not bot or bot.kind ~= "music" then return json_error(400, "unknown or unsupported bot_key") end
+    local limit = math.max(1, math.min(1000, tonumber(req.query.limit) or 100))
+    local category = req.query.category
+    local table_name = bot.table_prefix .. "_telemetry_events"
+    local ok, exists = pcall(db.table_exists, bot.db_schema, table_name)
+    if not ok or not exists then return 200, { ok = true, events = {} } end
+    local sql, args
+    if category and category ~= "" then
+      sql = ("SELECT event_category, event_name, guild_id, numeric_value, text_value, created_at FROM %s " ..
+        "WHERE event_category = %%s ORDER BY created_at DESC LIMIT %%s"):format(table_name)
+      args = { category, limit }
+    else
+      sql = ("SELECT event_category, event_name, guild_id, numeric_value, text_value, created_at FROM %s " ..
+        "ORDER BY created_at DESC LIMIT %%s"):format(table_name)
+      args = { limit }
+    end
+    local rok, rows = pcall(db.fetchall, bot.db_schema, sql, unpack(args))
+    if not rok then return 503, { detail = "Telemetry query failed: " .. tostring(rows) } end
+    return 200, { ok = true, events = rows or {} }
+  end)
+
   -- ---------------------------------------------------------- alert-rules
   httpd.route("GET", "/api/alert-rules", function(req)
     local a, status, err_body = require_admin_or_moderator(req)
