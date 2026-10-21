@@ -1548,6 +1548,24 @@ small,
   font-size: 0.78rem;
 }
 
+/* 2026-10-21: live voice-ping chip -- empty/no attribute when there's no
+   active session (see patchPing in pages_fleet.lua), colored by the same
+   --ok/--accent/--danger tones the rest of the dashboard already uses for
+   good/borderline/bad. Thresholds match typical "fine"/"notice"/"problem"
+   voice latency, not anything Discord documents. */
+.chip-row span[data-ping-tone="good"] {
+  border-color: color-mix(in srgb, var(--ok) 54%, var(--line));
+  color: var(--ok);
+}
+.chip-row span[data-ping-tone="warn"] {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--line));
+  color: color-mix(in srgb, var(--accent) 72%, white);
+}
+.chip-row span[data-ping-tone="bad"] {
+  border-color: color-mix(in srgb, var(--danger) 54%, var(--line));
+  color: #ffd0d0;
+}
+
 .data-pill {
   display: inline-flex;
   align-items: center;

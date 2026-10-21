@@ -81,8 +81,19 @@ function M.register(cfg)
       if age and age > 120 then return true end
       return false
     end
+    -- 2026-10-21 (per operator request: "the online system needs
+    -- revamping"): checked before is_playing/is_paused on purpose -- a bot
+    -- can be mid-flap (TrackStartEvent firing repeatedly between Discord
+    -- kills, confirmed live the same day) and still have session.is_playing
+    -- true at the instant this renders, which would otherwise show a
+    -- reassuring "Live" pill for a bot that's actually looping. See
+    -- dashboard.lua's node_status for what sets status="degraded".
+    local function voice_degraded(bot)
+      return tostring(bot.status or ""):lower() == "degraded"
+    end
     local function playback_badge(session, bot)
       if bot_is_offline(bot) then return "danger", "Offline" end
+      if voice_degraded(bot) then return "danger", "Degraded" end
       if session and session.is_playing then return "live", "Live" end
       if session and session.is_paused then return "soft", "Paused" end
       local status_lower = tostring(bot.heartbeat_status or bot.status or ""):lower()
@@ -590,8 +601,12 @@ function M.register(cfg)
           for (const s of bot.sessions || []) { if (s.is_playing) return s; }
           return (bot.sessions && bot.sessions[0]) || null;
         }
+        function voiceDegraded(bot) {
+          return String(bot.status || "").toLowerCase() === "degraded";
+        }
         function playbackBadge(session, bot) {
           if (botIsOffline(bot)) return ["danger", "Offline"];
+          if (voiceDegraded(bot)) return ["danger", "Degraded"];
           if (session && session.is_playing) return ["live", "Live"];
           if (session && session.is_paused) return ["soft", "Paused"];
           const statusLower = String(bot.heartbeat_status || bot.status || "").toLowerCase();
@@ -651,8 +666,28 @@ function M.register(cfg)
               <span>${bot.known_guild_count || 0} guilds</span>
               <span data-queue-pressure>${bot.queue_depth || 0} queued</span>
               <span data-queue-pressure>${bot.backup_queue_depth || 0} backup</span>
+              <span data-bot-ping></span>
               ${uptimeSpan}
             </div>`;
+        }
+        // 2026-10-21 (per operator request: cards need "a actively always
+        // accurate tracked ms ping"): same live-patch pattern as
+        // patchHeartbeat below -- ping_ms comes from dashboard.lua's direct
+        // Lavalink query, refreshed every ~2s broadcast tick, and needs to
+        // update without a full card rebuild for the same stutter reason
+        // patchHeartbeat already exists. Sourced from the bot's currently
+        // playing session; a bot with no active session (nothing actually
+        // connected to voice right now) shows no ping chip at all, rather
+        // than a stale or fabricated number.
+        function patchPing(card, bot) {
+          const el = card.querySelector("[data-bot-ping]");
+          if (!el) return;
+          const session = bestSession(bot);
+          const ping = session ? Number(session.ping_ms) : NaN;
+          if (!Number.isFinite(ping)) { el.textContent = ""; el.removeAttribute("data-ping-tone"); return; }
+          const tone = ping < 100 ? "good" : ping < 300 ? "warn" : "bad";
+          el.textContent = ping + "ms ping";
+          el.setAttribute("data-ping-tone", tone);
         }
         function formatUptime(seconds) {
           seconds = Math.floor(Number(seconds) || 0);
@@ -730,6 +765,7 @@ function M.register(cfg)
               botCardMarkup.set(card, markup);
             }
             patchHeartbeat(card, bot);
+            patchPing(card, bot);
           }
         }
         function renderSessionRow(s) {
@@ -863,9 +899,21 @@ function M.register(cfg)
     -- Only bots this account can actually send orders to (a guild account
     -- gets its own guild's bots; POST /api/bots/control rejects the rest).
     local data = cfg.scoped_dashboard_data(a)
+    -- 2026-10-21 (per operator request: "all controls need to take into
+    -- account if the selected bot is in local or streaming mode"): the
+    -- control form issues the same PLAY/SKIP/etc. commands regardless of
+    -- mode (no command's actual behavior differs by mode -- checked
+    -- control.lua's full action list), so there's nothing to disable here.
+    -- What was actually missing is visibility: an operator picking a bot
+    -- from this dropdown had no way to tell its mode before sending a
+    -- command. data-mode carries it through to updateCommandPreview()
+    -- below without a second lookup.
     local bot_options = {}
     for _, bot in ipairs(data.bots) do
-      bot_options[#bot_options + 1] = ("<option value=\"%s\">%s</option>"):format(html.esc(bot.key), html.esc(bot.display_name))
+      local mode = bot.playback_mode
+      local mode_suffix = mode and (" (" .. mode:sub(1, 1):upper() .. mode:sub(2) .. ")") or ""
+      bot_options[#bot_options + 1] = ("<option value=\"%s\" data-mode=\"%s\" data-status=\"%s\">%s%s</option>"):format(
+        html.esc(bot.key), html.esc(mode or ""), html.esc(tostring(bot.status or "")), html.esc(bot.display_name), html.esc(mode_suffix))
     end
     local action_options = {}
     for _, act in ipairs(CONTROL_ACTIONS) do
@@ -928,6 +976,7 @@ function M.register(cfg)
           </select></label>
           <div class="command-preview-grid">
             <div class="preview-card"><span>Bot</span><strong id="cmd-preview-bot">--</strong></div>
+            <div class="preview-card"><span>Mode</span><strong id="cmd-preview-mode">--</strong></div>
             <div class="preview-card"><span>Action</span><strong id="cmd-preview-action">--</strong></div>
             <div class="preview-card"><span>Guild</span><strong id="cmd-preview-guild">--</strong></div>
             <div class="preview-card command-preview-primary" id="cmd-preview-summary">Choose a bot, action, and guild above to preview the order before sending.</div>
@@ -998,10 +1047,14 @@ function M.register(cfg)
       // plain-language readout of what the form will actually send, kept in
       // sync with every field change so it's accurate right up to submit.
       function updateCommandPreview() {
-        const botLabel = form.bot_key.selectedOptions[0] ? form.bot_key.selectedOptions[0].textContent : "--";
+        const selectedBotOpt = form.bot_key.selectedOptions[0];
+        const botLabel = selectedBotOpt ? selectedBotOpt.textContent : "--";
+        const botMode = selectedBotOpt ? selectedBotOpt.dataset.mode : "";
+        const botStatus = selectedBotOpt ? (selectedBotOpt.dataset.status || "").toLowerCase() : "";
         const action = form.action.value || "--";
         const guildLabel = form.guild_id.selectedOptions[0] ? form.guild_id.selectedOptions[0].textContent : "--";
         document.getElementById("cmd-preview-bot").textContent = botLabel;
+        document.getElementById("cmd-preview-mode").textContent = botMode ? (botMode[0].toUpperCase() + botMode.slice(1)) : "--";
         document.getElementById("cmd-preview-action").textContent = action;
         document.getElementById("cmd-preview-guild").textContent = guildLabel;
         const summary = document.getElementById("cmd-preview-summary");
@@ -1010,7 +1063,16 @@ function M.register(cfg)
           if (action === "PLAY" && form.source_url.value) detail = ` with "${form.source_url.value}"`;
           else if (action === "LOOP") detail = ` (${form.loop_mode.value})`;
           else if (action === "FILTER") detail = ` (${form.filter_mode.value})`;
-          summary.textContent = `${botLabel} will run ${action}${detail} in ${guildLabel}.`;
+          let warning = "";
+          // 2026-10-21 (per operator request, controls need mode/health
+          // awareness): the command still queues normally either way --
+          // control.lua has no health gate -- but an operator sending PLAY/
+          // SKIP/etc. to a bot whose voice link is actively degraded or
+          // offline should know the order may sit unapplied until it
+          // recovers, not silently assume it landed.
+          if (botStatus === "degraded") warning = " Heads up: this bot's voice link is currently degraded -- the order will queue but may not apply until it recovers.";
+          else if (botStatus === "offline" || botStatus === "stale") warning = " Heads up: this bot looks offline right now -- the order will queue but won't run until it reconnects.";
+          summary.textContent = `${botLabel} will run ${action}${detail} in ${guildLabel}.${warning}`;
         } else {
           summary.textContent = "Choose a bot, action, and guild above to preview the order before sending.";
         }

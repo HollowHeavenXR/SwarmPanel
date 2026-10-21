@@ -31,4 +31,4 @@ ios/*.xcodeproj/
 ios/build/
 ios/ExportOptions.plist
 ios/.build/
-ios/DerivedData/
+ios/DerivedData/lua/result

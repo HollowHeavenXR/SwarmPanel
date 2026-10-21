@@ -158,6 +158,10 @@ function M.load()
     db_default_schema = M.env("PANEL_DB_DEFAULT_SCHEMA", "discord_music_gws"),
     admin_username = M.env("PANEL_ADMIN_USERNAME", "admin"),
     admin_password = M.env("PANEL_ADMIN_PASSWORD", ""),
+    -- 2026-10-21: shared fleet-wide across both hosts (Mel + this one) --
+    -- used for the live voice-ping lookup against each bot's own Lavalink
+    -- node (see dashboard.lua).
+    lavalink_password = M.env("LAVALINK_PASSWORD", ""),
     session_secret = M.env("PANEL_SESSION_SECRET", ""),
     -- BUGFIX: the session cookie (routes.lua's session_cookie_header) was
     -- missing the Secure attribute -- HttpOnly and SameSite=Lax were both

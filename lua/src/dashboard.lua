@@ -5,8 +5,76 @@ local db = require("db")
 local config = require("config")
 local Redis = require("swarmlua.redis")
 local telemetry = require("telemetry")
+local socket_http = require("socket.http")
+local ltn12 = require("ltn12")
+local cjson = require("cjson")
+local copas_http_ok, copas_http = pcall(require, "copas.http")
 
 local M = {}
+
+-- 2026-10-21 BUGFIX: each bot persists its OWN view of its Lavalink host
+-- (see rhythm.lua's swarm_health writeup), which is "127.0.0.1" for every
+-- bot regardless of which physical machine it runs on -- correct from
+-- that bot's own perspective (it really does reach Lavalink over its own
+-- loopback), meaningless from SwarmPanel's, which needs the real reachable
+-- address. Confirmed live: gws/nexus had real, current session data
+-- persisted and still returned no ping, because SwarmPanel was dialing
+-- ITS OWN loopback instead of Mel's. This mirrors the exact split this
+-- session's fleet migration left things in (see mel-migration-architecture
+-- notes) -- update alongside any future bot move between hosts.
+local MEL_HOSTED_BOTS = {
+  gws = true, tunestream = true, melodic = true, sapphire = true, maestro = true, nexus = true,
+}
+local function resolve_lavalink_host(bot_key, reported_host)
+  if reported_host == "127.0.0.1" and MEL_HOSTED_BOTS[bot_key] then return "192.168.1.87" end
+  return reported_host
+end
+
+-- 2026-10-21 (per operator request: cards need a live, accurate voice
+-- ping): queries this bot's own Lavalink node directly for every guild's
+-- current state.ping in one call -- /v4/sessions/{id}/players returns every
+-- player on that session, not just one, so this is one REST call per bot
+-- per dashboard refresh, not one per guild. Lavalink has no "list every
+-- session" endpoint (confirmed live: GET /v4/sessions 404s on 4.2.2), which
+-- is exactly why session_id has to be persisted by the bot itself (see
+-- rhythm.lua's swarm_health writeup) rather than discovered here.
+-- Short timeout (2s): this runs on the ~2s dashboard broadcast loop, and a
+-- slow/unreachable node (the whole point of checking) must degrade this one
+-- widget, not stall the broadcast for every connected operator.
+local LAVALINK_PING_TIMEOUT_SECONDS = 2
+local function fetch_lavalink_pings(host, port, session_id)
+  if not (host and port and session_id and session_id ~= "") then return {} end
+  local url = ("http://%s:%s/v4/sessions/%s/players"):format(host, tostring(port), session_id)
+  local response_body = {}
+  -- 2026-10-21 BUGFIX: http.request's table form returns (1, code, headers,
+  -- status) on success -- the FIRST value is just a literal 1, not the
+  -- body or status. Confirmed live: the earlier version checked that bare
+  -- `1` against 200 and silently discarded every real ping (always fell
+  -- through to the empty-table return) despite the request actually
+  -- succeeding every time.
+  local pcall_ok, _, code = pcall(function()
+    local request = {
+      url = url, method = "GET", sink = ltn12.sink.table(response_body), redirect = false,
+      headers = { ["Authorization"] = config.settings.lavalink_password },
+      timeout = LAVALINK_PING_TIMEOUT_SECONDS,
+    }
+    if copas_http_ok and coroutine.isyieldable and coroutine.isyieldable() then
+      return copas_http.request(request)
+    end
+    socket_http.TIMEOUT = LAVALINK_PING_TIMEOUT_SECONDS
+    return socket_http.request(request)
+  end)
+  if not pcall_ok or code ~= 200 then return {} end
+  local decode_ok, players = pcall(cjson.decode, table.concat(response_body))
+  if not decode_ok or type(players) ~= "table" then return {} end
+  local pings = {}
+  for _, p in ipairs(players) do
+    if p.guildId and p.state and p.state.ping then
+      pings[tostring(p.guildId)] = db.toint(p.state.ping, nil)
+    end
+  end
+  return pings
+end
 
 -- Persists across calls within this process (get_dashboard_data runs on
 -- both the ~2s WS broadcast loop and every /api/dashboard request) so the
@@ -178,18 +246,27 @@ end
 -- succeeds). detect_media_source now takes that real flag directly instead
 -- of re-deriving a guess from the filesystem -- see forced_local_map below,
 -- built from that same table.
+-- 2026-10-21 (per operator request): relabeled now that PLAYBACK_MODE=local
+-- is the fleet-wide default, not a fallback a track escalates into after
+-- streaming fails -- "Cached (local)"/"YouTube" read like "normally
+-- streams, this one happened to fall back," which stopped being true the
+-- moment the whole fleet switched. The underlying forced_local signal
+-- (is_forced_local) is unchanged and already correct -- see this
+-- function's original header above forced_local_map in music_bot_snapshot
+-- for why it's real per-play ground truth, not a filesystem guess. Only
+-- the wording changed, to plainly say "downloaded" vs "streaming."
 local function detect_media_source(video_url, is_forced_local)
   video_url = video_url or ""
   if video_url == "" then return { key = "unknown", label = "Unknown" } end
   local host = video_url:match("^https?://([^/]+)")
   if host and YOUTUBE_HOSTS[host:lower()] then
     if is_forced_local then
-      return { key = "local_cache", label = "Cached (local)" }
+      return { key = "local_download", label = "Local Download" }
     end
-    return { key = "youtube", label = "YouTube" }
+    return { key = "youtube", label = "Streaming (YouTube)" }
   end
-  if host and host:lower():match("soundcloud%.com$") then return { key = "soundcloud", label = "SoundCloud" } end
-  if host then return { key = "link", label = "Direct Link" } end
+  if host and host:lower():match("soundcloud%.com$") then return { key = "soundcloud", label = "Streaming (SoundCloud)" } end
+  if host then return { key = "link", label = "Streaming (Direct Link)" } end
   return { key = "search", label = "Search" }
 end
 
@@ -207,11 +284,12 @@ local function music_bot_snapshot(bot)
     intelligence = prefix .. "_track_intelligence",
     recommendations = prefix .. "_smart_recommendations",
     playback_events = prefix .. "_playback_events",
+    error_events = prefix .. "_error_events",
   }
   local exists = db.batch_table_exists(schema, {
     names.playback, names.settings, names.queue, names.backup,
     names.home, names.heartbeat, names.metrics, names.intelligence, names.recommendations,
-    names.playback_events,
+    names.playback_events, names.error_events,
   })
 
   -- IMPORTANT: guild_id/channel_id are Discord snowflakes (bigint, routinely
@@ -466,25 +544,73 @@ local function music_bot_snapshot(bot)
       backup_restore_ready = backup_queue_count > 0
         and (session_state == "recovering" or session_state == "queued" or session_state == "configured" or session_state == "idle" or session_state == "paused"),
       home_channel_id = home_channel_id and tostring(home_channel_id) or nil,
+      -- 2026-10-21: filled in below, after the heartbeat query gives us
+      -- this bot's current Lavalink node/session -- see fetch_lavalink_pings.
+      ping_ms = nil,
     }
   end
 
   local heartbeat_age, heartbeat_status = nil, "unknown"
+  -- 2026-10-21 (per operator request: controls need to know local vs
+  -- streaming mode): playback_mode lives on swarm_health, written by each
+  -- bot's own heartbeat tick (see rhythm.lua's identical writeup) -- read
+  -- it from the same row/query as the heartbeat rather than a second query.
+  local playback_mode = nil
   if exists[names.heartbeat] then
     local row = db.fetchone(
       schema,
-      "SELECT status, EXTRACT(EPOCH FROM (NOW() - last_pulse))::int AS heartbeat_age FROM " .. names.heartbeat .. " WHERE bot_name = %s LIMIT 1",
+      "SELECT status, playback_mode, lavalink_node_host, lavalink_node_port, lavalink_session_id, " ..
+        "EXTRACT(EPOCH FROM (NOW() - last_pulse))::int AS heartbeat_age FROM " .. names.heartbeat .. " WHERE bot_name = %s LIMIT 1",
       bot.key
     )
     if row then
       heartbeat_age = db.toint(row.heartbeat_age, 0)
       heartbeat_status = row.status or "unknown"
+      playback_mode = row.playback_mode
+      -- 2026-10-21: see fetch_lavalink_pings' own header. One REST call
+      -- per bot (not per guild), merged into every session this bot has
+      -- by guild_id below.
+      local pings = fetch_lavalink_pings(resolve_lavalink_host(bot.key, row.lavalink_node_host), row.lavalink_node_port, row.lavalink_session_id)
+      for _, s in ipairs(sessions) do
+        s.ping_ms = pings[s.guild_id]
+      end
     end
+  end
+
+  -- BUGFIX 2026-10-21 (per operator request: "the online system needs
+  -- revamping"): a bare heartbeat only proves the PROCESS is alive --
+  -- confirmed live this same day, a bot can sit heartbeat-"online" for
+  -- hours while two duplicate instances fight over the same voice session
+  -- (repeated Discord "Session is no longer valid"/"Call terminated"
+  -- closes) and the dashboard would have shown nothing wrong the whole
+  -- time. voice_hard_invalidation (Discord explicitly killed a session,
+  -- see rhythm.lua's WebSocketClosedEvent handler) and
+  -- voice_recovery_giveup (this bot gave up reconnecting after repeated
+  -- attempts) are both real, already-persisted signals of exactly that --
+  -- a recent one of either means voice is actively unhealthy for this bot
+  -- right now, regardless of what the heartbeat says. Window matches the
+  -- longer of the two cooldowns those events themselves impose (10min
+  -- giveup cooldown) plus margin, so a currently-stuck guild stays flagged
+  -- for the duration it's actually stuck, not just the instant the event fired.
+  local voice_degraded = false
+  if exists[names.error_events] then
+    local row = db.fetchone(
+      schema,
+      "SELECT COUNT(*) AS n FROM " .. names.error_events ..
+        " WHERE error_type IN ('voice_hard_invalidation', 'voice_recovery_giveup') AND created_at > NOW() - INTERVAL '12 minutes'"
+    )
+    voice_degraded = row ~= nil and db.toint(row.n, 0) > 0
   end
 
   local node_status = "unknown"
   if heartbeat_age ~= nil then
-    node_status = (heartbeat_age <= 120) and "online" or "stale"
+    if heartbeat_age > 120 then
+      node_status = "stale"
+    elseif voice_degraded then
+      node_status = "degraded"
+    else
+      node_status = "online"
+    end
   end
 
   local queue_depth, backup_depth = 0, 0
@@ -504,6 +630,7 @@ local function music_bot_snapshot(bot)
     status = node_status,
     heartbeat_age_seconds = heartbeat_age,
     heartbeat_status = heartbeat_status,
+    playback_mode = playback_mode,
     active_playing_count = active_playing_count,
     known_guild_count = known_guild_count,
     queue_depth = queue_depth,
