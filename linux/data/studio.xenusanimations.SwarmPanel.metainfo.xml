@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>studio.xenusanimations.SwarmPanel</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <name>SwarmPanel</name>
+  <summary>Live status and playback control for the music bot fleet</summary>
+  <description>
+    <p>
+      Native Linux client for SwarmPanel, the command centre for Aria and the
+      12-node Discord music bot fleet. It shows live bot status, sends
+      playback and queue orders, exposes owner-safe administration, and
+      carries the panel's community and account surfaces.
+    </p>
+  </description>
+  <launchable type="desktop-id">studio.xenusanimations.SwarmPanel.desktop</launchable>
+  <developer id="studio.xenusanimations">
+    <name>HeavenlyXenusVR</name>
+  </developer>
+  <url type="homepage">https://swarmpanel.xenusanimations.studio</url>
+  <releases>
+    <release version="1.0.0" date="2026-10-04">
+      <description><p>First native Linux release.</p></description>
+    </release>
+  </releases>
+</component>

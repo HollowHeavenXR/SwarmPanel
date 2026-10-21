@@ -1,0 +1,74 @@
+/* Only the few things Adwaita has no token for. Everything else is left to
+   the system stylesheet so the app follows the user's theme and accent. */
+
+.swarm-pill {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: alpha(currentColor, 0.12);
+}
+.swarm-ok     { color: @success_color; }
+.swarm-warn   { color: @warning_color; }
+.swarm-bad    { color: @error_color; }
+
+.swarm-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: @accent_bg_color;
+  color: @accent_fg_color;
+  font-size: 0.78em;
+}
+
+.swarm-tile {
+  padding: 12px 14px;
+}
+
+.swarm-nav-active {
+  background: alpha(@accent_bg_color, 0.16);
+  font-weight: 700;
+}
+
+.swarm-code {
+  padding: 10px;
+  font-size: 0.92em;
+}
+
+.swarm-table {
+  font-size: 0.95em;
+}
+
+/* Now-playing artwork placeholder keeps its box while the image loads, so
+   cards don't jump as snapshots arrive every couple of seconds. */
+.swarm-art {
+  border-radius: 10px;
+  background: alpha(currentColor, 0.08);
+}
+
+/* --- panel preference classes ------------------------------------------
+   Set on the window by ui/theme.py from the account's panel preferences,
+   so the desktop client visibly follows the same appearance choices as the
+   web panel and the phone. */
+
+.swarm-compact .swarm-tile      { padding: 8px 10px; }
+.swarm-compact row              { min-height: 36px; }
+.swarm-comfortable .swarm-tile  { padding: 14px 16px; }
+
+.swarm-large   { font-size: 1.08em; }
+.swarm-dense   { font-size: 0.93em; }
+
+.swarm-crisp .card,
+.swarm-crisp .swarm-tile,
+.swarm-crisp .swarm-art         { border-radius: 3px; }
+.swarm-soft .card,
+.swarm-soft .swarm-tile         { border-radius: 14px; }
+
+/* Honour "reduced motion" by removing the crossfade between screen states
+   and the progress-bar easing, rather than only shortening them. */
+.swarm-reduced * {
+  transition: none;
+  animation: none;
+}
+
+/* Now-playing timeline: keep the bar readable at small sizes and stop the
+   elapsed/total labels jittering as the digits change width. */
+.numeric { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+progress, trough { min-height: 6px; }

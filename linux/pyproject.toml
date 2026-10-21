@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "swarmpanel"
+version = "1.0.0"
+description = "Native Linux client for SwarmPanel — the command centre for Aria and the music bot fleet"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "HeavenlyXenusVR" }]
+dependencies = ["PyGObject>=3.46", "websockets>=12"]
+
+[project.scripts]
+swarmpanel = "swarmpanel.ui.app:main"
+
+[tool.setuptools.packages.find]
+include = ["swarmpanel*"]
+
+[tool.setuptools.package-data]
+swarmpanel = ["ui/*.css"]

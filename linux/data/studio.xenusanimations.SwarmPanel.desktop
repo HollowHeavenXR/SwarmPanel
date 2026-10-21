@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=SwarmPanel
+GenericName=Bot Fleet Control
+Comment=Live status and playback control for Aria and the music bot fleet
+Exec=swarmpanel
+Icon=studio.xenusanimations.SwarmPanel
+Terminal=false
+Categories=Network;Monitor;AudioVideo;
+Keywords=discord;music;bot;swarm;fleet;panel;
+StartupNotify=true
+StartupWMClass=studio.xenusanimations.SwarmPanel
