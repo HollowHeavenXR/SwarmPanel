@@ -326,7 +326,7 @@ pub fn bot_is_offline(bot: DashboardBot) -> bool {
 }
 
 #[uniffi::export]
-pub fn featured_session(bot: DashboardBot) -> Option<DashboardSession> {
+pub fn bot_featured_session(bot: DashboardBot) -> Option<DashboardSession> {
     let all = bot.sessions.unwrap_or_default();
     all.iter().find(|s| s.is_playing == Some(true)).cloned().or_else(|| all.first().cloned())
 }

@@ -401,6 +401,20 @@ impl SwarmCore {
     pub fn cached_dashboard(&self) -> Option<CachedDashboard> {
         crate::helpers::cached_dashboard(&self.inner)
     }
+    /// Remembers the last account snapshot (Apple TV first paint).
+    pub fn save_account_cache(&self, snapshot: AccountSnapshot) {
+        if let Ok(t) = serde_json::to_string(&snapshot) {
+            self.inner.store.set(keys::ACCOUNT_CACHE.into(), Some(t), false);
+        }
+    }
+    pub fn cached_account(&self) -> Option<AccountSnapshot> {
+        let t = self.inner.store.get(keys::ACCOUNT_CACHE.into(), false)?;
+        crate::lenient::decode::<AccountSnapshot>(&t).ok()
+    }
+    /// Saves a dashboard pushed over the live socket (throttled to every 30s).
+    pub fn save_dashboard_cache(&self, dashboard: DashboardResponse) {
+        crate::helpers::cache_dashboard(&self.inner, &dashboard);
+    }
     pub async fn bots(&self) -> Result<BotsResponse, ApiError> {
         call!(self, |i| i.get("/api/bots", &[]).await)
     }
@@ -581,6 +595,25 @@ impl SwarmCore {
     }
     pub async fn mark_all_notifications_read(&self) -> Result<OkResponse, ApiError> {
         call!(self, |i| i.post("/api/notifications/read-all", json!({})).await)
+    }
+    /// Unread notifications newer than the last one handed out here (for
+    /// background-refresh local alerts); remembers the newest id it saw.
+    pub async fn fresh_notifications(&self) -> Result<Vec<PanelNotification>, ApiError> {
+        call!(self, |i| {
+            if i.token().is_none() {
+                return Ok(vec![]);
+            }
+            let r: NotificationsResponse = i.get("/api/notifications", &[]).await?;
+            let unread: Vec<PanelNotification> = r.notifications.unwrap_or_default().into_iter().filter(|n| n.read_at.is_none()).collect();
+            let last: i64 = i.store.get(keys::LAST_NOTIFIED.into(), false).and_then(|s| s.parse().ok()).unwrap_or(0);
+            let mut fresh: Vec<PanelNotification> = unread.iter().filter(|n| n.id.0 > last).cloned().collect();
+            fresh.sort_by_key(|n| n.id.0);
+            if let Some(max) = unread.iter().map(|n| n.id.0).max() {
+                i.store.set(keys::LAST_NOTIFIED.into(), Some(max.max(last).to_string()), false);
+            }
+            let n = fresh.len();
+            Ok(fresh.into_iter().skip(n.saturating_sub(5)).collect())
+        })
     }
     pub async fn community_counts(&self) -> Result<CommunityCounts, ApiError> {
         call!(self, |i| i.get("/api/community/counts", &[]).await)

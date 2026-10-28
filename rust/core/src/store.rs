@@ -19,4 +19,5 @@ pub mod keys {
     pub const DASHBOARD_CACHE_AT: &str = "swarmpanel.dashboardSnapshotAt.v2";
     pub const ACCOUNT_CACHE: &str = "swarmpanel.accountSnapshot.v2";
     pub const TV_USERNAME: &str = "swarmpanel.tv.username";
+    pub const LAST_NOTIFIED: &str = "swarmpanel.lastNotifiedNotificationId";
 }
