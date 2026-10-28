@@ -1,0 +1,15 @@
+[package]
+name = "swarmpanel-web"
+version = "2.0.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "=0.2.100"
+js-sys = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlSelectElement", "HtmlTextAreaElement", "HtmlFormElement", "HtmlButtonElement", "Node", "NodeList", "DomTokenList", "Event", "EventTarget", "KeyboardEvent", "MouseEvent", "SubmitEvent", "CustomEvent", "CustomEventInit", "WebSocket", "MessageEvent", "CloseEvent", "BinaryType", "Location", "History", "Storage", "Headers", "Request", "RequestInit", "RequestMode", "RequestCredentials", "Response", "FormData", "File", "FileList", "Blob", "Url", "Performance", "console", "DomRect", "CssStyleDeclaration", "Navigator", "Clipboard", "HtmlTemplateElement", "DocumentFragment", "HtmlCollection", "HtmlAnchorElement", "HtmlImageElement", "HtmlDialogElement", "HtmlDetailsElement", "MediaQueryList", "Notification", "NotificationPermission", "VisibilityState", "PointerEvent", "DomRectList"] }
+wasm-bindgen-futures = "0.4"
