@@ -19,6 +19,14 @@
       },
       "versions": [
         {
+          "version": "0.18.0",
+          "date": "2026-10-28T05:40:01Z",
+          "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.18.0/SwarmPanel-0.18.0-unsigned.ipa",
+          "localizedDescription": "See release notes on GitHub.",
+          "size": 5572868,
+          "minOSVersion": "16.0"
+        },
+        {
           "version": "0.17.0",
           "date": "2026-10-04T03:01:47Z",
           "downloadURL": "https://github.com/HollowHeavenXR/SwarmPanel/releases/download/ios%2Fv0.17.0/SwarmPanel-0.17.0-unsigned.ipa",
