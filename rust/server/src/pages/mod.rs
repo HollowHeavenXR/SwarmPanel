@@ -61,7 +61,7 @@ pub static SECTIONS: &[Section] = &[
         label: "Fleet",
         badge: None,
         items: &[
-            it("/", "Dashboard", "grid", When::Any, "Live status across the swarm."),
+            it("/", "Live wall", "grid", When::Any, "Every bot, live, at a glance."),
             it("/controls", "Controls", "play", When::Any, "Send orders to any bot in any guild."),
             it("/invites", "Invites", "link", When::Any, "Invite links for every bot."),
         ],
@@ -77,7 +77,7 @@ pub static SECTIONS: &[Section] = &[
     },
     Section {
         key: "community",
-        label: "Community",
+        label: "People",
         badge: Some("community"),
         items: &[
             it("/users", "Directory", "users", When::Any, "Find other operators."),
@@ -319,16 +319,21 @@ fn badge_slot(a: &Auth, name: Option<&str>) -> Markup {
     }
 }
 
-fn nav_lists(a: &Auth, path: &str) -> Markup {
+/// Top command bar: one dropdown per section (only sections with visible items).
+fn nav_menus(a: &Auth, path: &str) -> Markup {
     html! {
         @for s in SECTIONS {
             @let items: Vec<&Item> = s.items.iter().filter(|i| can_see(a, i.when)).collect();
             @if !items.is_empty() {
-                div.nav-group {
-                    div.nav-heading { span { (s.label) } (badge_slot(a, s.badge)) }
-                    @for i in items {
-                        a.nav-link.active[is_active(path, i.to)] href=(i.to) aria-current=[is_active(path, i.to).then_some("page")] {
-                            (ui::icon(i.icon)) span.nav-text { (i.label) } (badge_slot(a, i.badge))
+                @let here = items.iter().any(|i| is_active(path, i.to));
+                details.navmenu {
+                    summary.navtrigger.here[here] { (s.label) (badge_slot(a, s.badge)) svg.chev viewBox="0 0 12 12" aria-hidden="true" { path d="M3 4.5l3 3 3-3" {} } }
+                    div.navpanel {
+                        @for i in &items {
+                            a.navitem.here[is_active(path, i.to)] href=(i.to) aria-current=[is_active(path, i.to).then_some("page")] {
+                                span.navicon { (ui::icon(i.icon)) }
+                                span.navcopy { strong { (i.label) (badge_slot(a, i.badge)) } small { (i.blurb) } }
+                            }
                         }
                     }
                 }
@@ -337,7 +342,24 @@ fn nav_lists(a: &Auth, path: &str) -> Markup {
     }
 }
 
-const MOBILE_PRIMARY: &[(&str, &str, &str)] = &[("/", "Fleet", "grid"), ("/controls", "Controls", "play"), ("/users", "People", "users"), ("/messages", "Inbox", "mail")];
+/// Everything the ⌘K palette can jump to (rendered as JSON data for the WASM module).
+fn palette_items(ctx: &Ctx) -> Value {
+    let mut items: Vec<Value> = Vec::new();
+    for s in SECTIONS {
+        for i in s.items.iter().filter(|i| can_see(&ctx.a, i.when)) {
+            items.push(serde_json::json!({ "label": i.label, "hint": s.label, "href": i.to, "keys": i.blurb }));
+        }
+    }
+    for b in ctx.app().settings.bots.iter().filter(|b| b.is_music()) {
+        items.push(serde_json::json!({ "label": format!("Control {}", b.display_name), "hint": "Bot", "href": format!("/controls?bot={}", b.key), "keys": format!("{} play pause skip queue", b.key) }));
+    }
+    for (label, href) in [("Sign out", "/logout#post"), ("Appearance settings", "/appearance")] {
+        items.push(serde_json::json!({ "label": label, "hint": "Account", "href": href, "keys": "" }));
+    }
+    Value::Array(items)
+}
+
+const MOBILE_PRIMARY: &[(&str, &str, &str)] = &[("/", "Wall", "grid"), ("/controls", "Control", "play"), ("/users", "People", "users"), ("/messages", "Inbox", "mail")];
 
 pub static ASSET_VERSION: LazyLock<String> = LazyLock::new(|| {
     let mut h: u64 = 0xcbf29ce484222325;
@@ -355,8 +377,12 @@ fn document(title: &str, prefs: &Value, token: Option<&str>, body: Markup) -> St
         meta charset="utf-8";
         meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cut";
         meta name="color-scheme" content="dark light";
+        meta name="theme-color" content="#07080c";
         title { (title) " · SwarmPanel" }
         link rel="icon" href="/favicon.svg" type="image/svg+xml";
+        link rel="preconnect" href="https://fonts.googleapis.com";
+        link rel="preconnect" href="https://fonts.gstatic.com" crossorigin;
+        link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap";
         link rel="stylesheet" href=(format!("/static/app.css?v={v}"));
         @if let Some(t) = token { meta name="sp-token" content=(t); }
         // wasm-bindgen's generated loader; the only script on the page.
@@ -367,78 +393,77 @@ fn document(title: &str, prefs: &Value, token: Option<&str>, body: Markup) -> St
 
 pub fn render(ctx: &Ctx, p: Page) -> Reply {
     let a = &ctx.a;
-    let crumb = locate(p.path);
+    let section = locate(p.path).map(|(s, _)| s.label);
     let name = if a.username.is_empty() { "Operator".to_string() } else { a.username.clone() };
     let initial: String = name.chars().next().map(|c| c.to_uppercase().to_string()).unwrap_or_default();
     let body = html! {
         body {
             a.skip href="#main" { "Skip to content" }
-            div.shell {
-                aside.sidebar #sidebar aria-label="Main" {
-                    a.brand href="/" { span.brand-mark { (ui::icon("hex")) } span.brand-name { "SwarmPanel" small { "Fleet Command" } } }
-                    nav.nav { (nav_lists(a, p.path)) }
-                    div.sidebar-foot {
-                        span.mode-pill.admin[a.is_admin()] { @if a.is_admin() { "Admin" } @else if a.moderator { "Moderator" } @else { "Operator" } }
+            header.cmdbar {
+                div.cmdbar-row {
+                    a.logo href="/" aria-label="SwarmPanel home" { span.logo-mark { (ui::icon("hex")) } span.logo-word { "swarm" b { "panel" } } }
+                    nav.navmenus aria-label="Main" { (nav_menus(a, p.path)) }
+                    button.palette-btn type="button" data-palette-open aria-label="Search and commands" {
+                        (ui::icon("search")) span { "Jump to…" } kbd { "⌘K" }
+                    }
+                    div.cmd-actions {
+                        @if a.site_owner {
+                            button.mode.on[a.is_admin()] type="button" data-post="/api/session/admin-mode" data-body=(format!("{{\"enabled\":{}}}", !a.is_admin())) data-done="reload" title="Toggle admin mode" {
+                                span.mode-dot {} span.mode-label { @if a.is_admin() { "Admin" } @else { "Guild view" } }
+                            }
+                        }
+                        @if a.guild_id.is_some() {
+                            div.bell {
+                                button.roundbtn type="button" data-toggle="#notif-panel" aria-label="Notifications" {
+                                    (ui::icon("bell")) span.badge data-bind="notifications:unread_count" hidden {}
+                                }
+                                div.notif-panel.pop #notif-panel {
+                                    div.pop-head { strong { "Notifications" } button.link-btn type="button" data-post="/api/notifications/read-all" data-done="refresh:#notif-list" { "Mark all read" } }
+                                    div #notif-list data-src="/frag/notifications" data-live="notifications" data-lazy { div.empty { "Loading…" } }
+                                }
+                            }
+                        }
+                        details.navmenu.me-menu {
+                            summary.me { span.avatar.sm { (initial) } span.me-name { (name) } }
+                            div.navpanel.right {
+                                a.navitem href="/profile" { span.navicon { (ui::icon("user")) } span.navcopy { strong { "Profile" } small { "How you appear to others" } } }
+                                a.navitem href="/appearance" { span.navicon { (ui::icon("palette")) } span.navcopy { strong { "Appearance" } small { "Theme, density, motion" } } }
+                                form method="post" action="/logout" { button.navitem type="submit" { span.navicon { (ui::icon("logout")) } span.navcopy { strong { "Sign out" } small { (name) } } } }
+                            }
+                        }
                     }
                 }
-                div.scrim data-close="#sidebar" {}
-                div.main-col {
-                    header.topbar {
-                        button.icon-btn.menu-btn type="button" data-toggle="#sidebar" aria-label="Menu" { (ui::icon("menu")) }
-                        nav.crumbs aria-label="Breadcrumb" {
-                            @if let Some((s, i)) = crumb {
-                                span { (s.label) } span.sep { "/" }
-                                a href=(i.to) { (i.label) }
-                                @if i.label != p.title { span.sep { "/" } span { (p.title) } }
-                            } @else { span { (p.title) } }
-                        }
-                        div.top-actions {
-                            @if a.site_owner {
-                                button.chip-btn.on[a.is_admin()] type="button" data-post="/api/session/admin-mode" data-body=(format!("{{\"enabled\":{}}}", !a.is_admin())) data-done="reload" title="Toggle admin mode" {
-                                    span.dot {} @if a.is_admin() { "Admin on" } @else { "Admin off" }
-                                }
-                            }
-                            @if a.guild_id.is_some() {
-                                div.bell {
-                                    button.icon-btn type="button" data-toggle="#notif-panel" aria-label="Notifications" {
-                                        (ui::icon("bell")) span.badge data-bind="notifications:unread_count" hidden {}
-                                    }
-                                    div.notif-panel.pop #notif-panel {
-                                        div.pop-head { strong { "Notifications" } button.link-btn type="button" data-post="/api/notifications/read-all" data-done="refresh:#notif-list" { "Mark all read" } }
-                                        div #notif-list data-src="/frag/notifications" data-live="notifications" data-lazy { div.empty { "Loading…" } }
-                                    }
-                                }
-                            }
-                            a.me href="/profile" title="Your profile" { span.avatar.sm { (initial) } span.me-name { (name) } }
-                            form method="post" action="/logout" { button.icon-btn type="submit" title="Sign out" aria-label="Sign out" { (ui::icon("logout")) } }
-                        }
+                div.statusline #statusline data-src="/frag/status" data-live="dashboard" aria-live="off" { (fleet::status_line(ctx)) }
+            }
+            main.stage #main {
+                div.page-head {
+                    div {
+                        @if let Some(sec) = section { span.kicker { (sec) } }
+                        h1 { (p.title) }
+                        @if !p.lede.is_empty() { p.lede { (p.lede) } }
                     }
-                    main.stage #main {
-                        @if let Some((s, _)) = crumb {
-                            @let tabs: Vec<&Item> = s.items.iter().filter(|i| can_see(a, i.when)).collect();
-                            @if tabs.len() > 1 {
-                                nav.tabs aria-label=(s.label) {
-                                    @for i in tabs { a.tab.active[is_active(p.path, i.to)] href=(i.to) { (i.label) (badge_slot(a, i.badge)) } }
-                                }
-                            }
-                        }
-                        div.page-head {
-                            div {
-                                h1 { (p.title) }
-                                @if !p.lede.is_empty() { p.lede { (p.lede) } }
-                            }
-                            @if let Some(act) = &p.actions { div.page-actions { (act) } }
-                        }
-                        (p.body)
-                    }
-                    footer.footer { span { "SwarmPanel · HollowHeavenXR" } a href="https://discord.com/users/1304564041863266347" target="_blank" rel="noreferrer" { "Discord" } }
+                    @if let Some(act) = &p.actions { div.page-actions { (act) } }
                 }
+                (p.body)
+            }
+            footer.footer { span { "SwarmPanel · HollowHeavenXR" } a href="https://discord.com/users/1304564041863266347" target="_blank" rel="noreferrer" { "Discord" } }
+            aside.drawer #drawer aria-label="Details" {
+                button.roundbtn.drawer-close type="button" data-close="#drawer" aria-label="Close" { (ui::icon("x")) }
+                div #drawer-body data-src="" data-live="dashboard" data-lazy {}
+            }
+            div.veil data-close="#drawer" {}
+            div.palette #palette role="dialog" aria-modal="true" aria-label="Jump to" {
+                div.palette-box {
+                    label.palette-input { (ui::icon("search")) input type="text" placeholder="Jump to a page, bot or action…" autocomplete="off" spellcheck="false" aria-label="Search"; kbd { "esc" } }
+                    ul.palette-list role="listbox" {}
+                }
+                script type="application/json" #palette-data { (PreEscaped(palette_items(ctx).to_string().replace("</", "<\\/"))) }
             }
             nav.tabbar aria-label="Quick" {
                 @for (to, label, icon) in MOBILE_PRIMARY {
-                    a.active[is_active(p.path, to)] href=(to) { (ui::icon(icon)) span { (label) } }
+                    a.here[is_active(p.path, to)] href=(to) { (ui::icon(icon)) span { (label) } }
                 }
-                button type="button" data-toggle="#sidebar" { (ui::icon("menu")) span { "More" } }
+                button type="button" data-palette-open { (ui::icon("search")) span { "Jump" } }
             }
             div #toast.toast role="status" aria-live="polite" {}
         }
@@ -520,6 +545,8 @@ async fn fragment(req: Req) -> Reply {
     };
     let m = match name.as_str() {
         "notifications" => community::notifications_frag(&ctx).await,
+        "status" => fleet::status_line_frag(&ctx).await,
+        "bot" => fleet::bot_panel_frag(&ctx).await,
         "dashboard" => fleet::dashboard_frag(&ctx).await,
         "events" => fleet::events_frag(&ctx).await,
         "control-state" => fleet::control_state_frag(&ctx).await,

@@ -921,7 +921,7 @@ fn toggle(sel: &str, force: Option<bool>) {
     for b in all_doc(&format!("[data-toggle=\"{sel}\"]")) {
         let _ = b.set_attribute("aria-expanded", if open { "true" } else { "false" });
     }
-    if t.id() == "sidebar" {
+    if t.id() == "sidebar" || t.id() == "drawer" || t.id() == "palette" {
         let _ = doc().body().map(|b| b.class_list().toggle_with_force("drawer-open", open));
     }
     if open {
@@ -932,11 +932,164 @@ fn toggle(sel: &str, force: Option<bool>) {
 }
 
 fn close_pops(except: Option<&Element>) {
-    for p in all_doc(".pop.open, .sidebar.open") {
+    for p in all_doc(".pop.open, .sidebar.open, .drawer.open, .palette.open") {
         if except.is_some_and(|e| p.contains(Some(e))) {
             continue;
         }
         toggle(&format!("#{}", p.id()), Some(false));
+    }
+}
+
+// ---- slide-over drawer ----------------------------------------------------------------------------
+fn open_drawer(src: &str) {
+    let Some(body) = doc().get_element_by_id("drawer-body") else { return };
+    let _ = body.set_attribute("data-src", src);
+    let _ = body.remove_attribute("data-loaded");
+    body.set_inner_html("<div class=\"panel-loading\"><span></span><span></span><span></span></div>");
+    toggle("#drawer", Some(true));
+    refresh("drawer-body".into(), true);
+}
+
+// ---- ⌘K palette -----------------------------------------------------------------------------------
+#[derive(Clone)]
+struct Item {
+    label: String,
+    hint: String,
+    href: String,
+    keys: String,
+}
+
+thread_local! {
+    static PAL: RefCell<(Vec<Item>, Vec<usize>, usize)> = RefCell::new((Vec::new(), Vec::new(), 0));
+}
+
+fn palette_items() -> Vec<Item> {
+    let raw = by_sel("#palette-data").and_then(|e| e.text_content()).unwrap_or_default();
+    serde_json::from_str::<Vec<Value>>(&raw)
+        .unwrap_or_default()
+        .iter()
+        .map(|v| {
+            let g = |k: &str| v.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+            Item { label: g("label"), hint: g("hint"), href: g("href"), keys: g("keys") }
+        })
+        .collect()
+}
+
+/// Subsequence match score (lower is better); None when it doesn't match.
+fn score(q: &str, item: &Item) -> Option<i32> {
+    if q.is_empty() {
+        return Some(0);
+    }
+    let label = item.label.to_lowercase();
+    if label.starts_with(q) {
+        return Some(0);
+    }
+    if label.contains(q) {
+        return Some(1);
+    }
+    let hay = format!("{} {} {}", label, item.hint.to_lowercase(), item.keys.to_lowercase());
+    if hay.split_whitespace().any(|w| w.starts_with(q)) {
+        return Some(2);
+    }
+    // Loose subsequence only against the label itself (e.g. "dgn" -> Diagnostics).
+    let mut it = label.chars();
+    (q.len() >= 2 && q.chars().all(|c| it.any(|h| h == c))).then_some(3)
+}
+
+fn palette_render() {
+    let q = by_sel("#palette input").and_then(|i| i.dyn_into::<HtmlInputElement>().ok()).map(|i| i.value().trim().to_lowercase()).unwrap_or_default();
+    PAL.with(|p| {
+        let mut p = p.borrow_mut();
+        let mut hits: Vec<(i32, usize)> = p.0.iter().enumerate().filter_map(|(i, it)| score(&q, it).map(|s| (s, i))).collect();
+        hits.sort();
+        p.1 = hits.into_iter().map(|(_, i)| i).take(12).collect();
+        if p.2 >= p.1.len() {
+            p.2 = 0;
+        }
+        let html: String = p
+            .1
+            .iter()
+            .enumerate()
+            .map(|(n, &i)| {
+                let it = &p.0[i];
+                format!("<li role=\"option\" data-pal=\"{n}\"{}><span>{}</span><small>{}</small></li>", if n == p.2 { " class=\"sel\" aria-selected=\"true\"" } else { "" }, esc(&it.label), esc(&it.hint))
+            })
+            .collect();
+        if let Some(list) = by_sel("#palette .palette-list") {
+            list.set_inner_html(if html.is_empty() { "<li class=\"none\">No matches</li>" } else { &html });
+        }
+    });
+}
+
+fn palette_open() {
+    PAL.with(|p| {
+        let mut p = p.borrow_mut();
+        if p.0.is_empty() {
+            p.0 = palette_items();
+        }
+        p.2 = 0;
+    });
+    toggle("#palette", Some(true));
+    if let Some(i) = by_sel("#palette input").and_then(|i| i.dyn_into::<HtmlInputElement>().ok()) {
+        i.set_value("");
+        let _ = i.focus();
+    }
+    palette_render();
+}
+
+fn palette_go(n: usize) {
+    let href = PAL.with(|p| {
+        let p = p.borrow();
+        p.1.get(n).map(|&i| p.0[i].href.clone())
+    });
+    let Some(href) = href else { return };
+    toggle("#palette", Some(false));
+    if href == "/logout#post" {
+        if let Some(f) = by_sel("form[action='/logout']").and_then(|f| f.dyn_into::<HtmlFormElement>().ok()) {
+            let _ = f.submit();
+        }
+        return;
+    }
+    let _ = win().location().assign(&href);
+}
+
+fn palette_key(e: &web_sys::KeyboardEvent) -> bool {
+    let open = by_sel("#palette.open").is_some();
+    let typing = doc().active_element().is_some_and(|a| matches!(a.tag_name().as_str(), "INPUT" | "TEXTAREA" | "SELECT"));
+    if !open {
+        if (e.key() == "k" && (e.meta_key() || e.ctrl_key())) || (e.key() == "/" && !typing) {
+            e.prevent_default();
+            palette_open();
+            return true;
+        }
+        return false;
+    }
+    match e.key().as_str() {
+        "ArrowDown" | "ArrowUp" => {
+            e.prevent_default();
+            PAL.with(|p| {
+                let mut p = p.borrow_mut();
+                let len = p.1.len().max(1);
+                p.2 = if e.key() == "ArrowDown" { (p.2 + 1) % len } else { (p.2 + len - 1) % len };
+            });
+            palette_render();
+            true
+        }
+        "Enter" => {
+            e.prevent_default();
+            palette_go(PAL.with(|p| p.borrow().2));
+            true
+        }
+        _ => false,
+    }
+}
+
+fn close_menus(except: Option<&Element>) {
+    for d in all_doc("details.navmenu[open], details.menu[open]") {
+        if except.is_some_and(|e| d.contains(Some(e))) {
+            continue;
+        }
+        let _ = d.remove_attribute("open");
     }
 }
 
@@ -945,6 +1098,27 @@ fn wire() {
     let d: web_sys::EventTarget = doc().into();
     on(&d, "click", |e| {
         let t = e.target();
+        close_menus(closest(&t, "details.navmenu, details.menu").as_ref());
+        if let Some(el) = closest(&t, "[data-pal]") {
+            palette_go(attr(&el, "data-pal").and_then(|v| v.parse().ok()).unwrap_or(0));
+            return;
+        }
+        if closest(&t, "[data-palette-open]").is_some() {
+            e.prevent_default();
+            palette_open();
+            return;
+        }
+        if let Some(p) = closest(&t, "#palette") {
+            if closest(&t, ".palette-box").is_none() {
+                toggle(&format!("#{}", p.id()), Some(false));
+            }
+            return;
+        }
+        if let Some(el) = closest(&t, "[data-drawer]") {
+            e.prevent_default();
+            open_drawer(&attr(&el, "data-drawer").unwrap_or_default());
+            return;
+        }
         if let Some(el) = closest(&t, "[data-post]") {
             e.prevent_default();
             if !el.has_attribute("disabled") {
@@ -979,7 +1153,7 @@ fn wire() {
             fill(&el);
             return;
         }
-        if closest(&t, ".pop, .sidebar").is_none() {
+        if closest(&t, ".pop, .sidebar, .drawer, .palette").is_none() {
             close_pops(None);
         }
     });
@@ -995,6 +1169,11 @@ fn wire() {
     });
     on(&d, "input", |e| {
         let Some(el) = e.target().and_then(|t| t.dyn_into::<Element>().ok()) else { return };
+        if el.closest("#palette").ok().flatten().is_some() {
+            PAL.with(|p| p.borrow_mut().2 = 0);
+            palette_render();
+            return;
+        }
         if let Some(form) = el.closest("form[data-get]").ok().flatten() {
             if el.dyn_ref::<HtmlInputElement>().is_some_and(|i| matches!(i.type_().as_str(), "search" | "text")) {
                 debounce_get(form);
@@ -1043,8 +1222,13 @@ fn wire() {
         }
     });
     on(&d, "keydown", |e| {
-        if e.dyn_ref::<web_sys::KeyboardEvent>().is_some_and(|k| k.key() == "Escape") {
+        let Some(k) = e.dyn_ref::<web_sys::KeyboardEvent>() else { return };
+        if palette_key(k) {
+            return;
+        }
+        if k.key() == "Escape" {
             close_pops(None);
+            close_menus(None);
         }
     });
     on(&d, "pointerdown", |e| {

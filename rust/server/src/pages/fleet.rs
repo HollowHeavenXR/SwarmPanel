@@ -63,57 +63,47 @@ pub fn playback(x: &Value, seek: Option<(&str, &str)>) -> Markup {
     }
 }
 
-fn bot_card(ctx: &Ctx, bot: &Value) -> Markup {
+fn art_style(x: Option<&Value>) -> String {
+    x.and_then(|x| x.s("thumbnail")).filter(|t| ui::safe_url(t).is_some()).map(|t| format!(";--art:url(\"{}\")", t.replace('"', "%22"))).unwrap_or_default()
+}
+
+fn compact(n: i64) -> String {
+    if n >= 10_000 { format!("{:.0}k", n as f64 / 1000.0) } else if n >= 1000 { format!("{:.1}k", n as f64 / 1000.0) } else { n.to_string() }
+}
+
+/// One tile on the wall. Clicking opens the bot's slide-over panel.
+fn tile(ctx: &Ctx, bot: &Value) -> Markup {
     let key = s(bot, "key");
     let off = offline(bot);
-    let style = format!("--card-accent:{}", accent(ctx, &key));
-    if s(bot, "kind") == "orchestrator" {
-        let m = bot.get("medic_summary").cloned().unwrap_or(json!({}));
-        return html! {
-            article.bot-card.orchestrator.is-offline[off] style=(style) {
-                header.bot-head {
-                    span.bot-dot {}
-                    div { h3 { (s(bot, "display_name")) } small { "Autonomous swarm orchestrator" } }
-                    (ui::pill(if off { "danger" } else { "live" }, if off { "Offline" } else { "Online" }))
-                }
-                div.bot-now {
-                    div.thumb.empty { (icon("gear")) }
-                    div {
-                        strong { (ui::plural(n(&m, "pending_repairs"), "pending repair", "pending repairs")) ", " (ui::plural(n(&m, "pending_infra"), "infra task", "infra tasks")) }
-                        small { (ui::plural(n(bot, "recent_interaction_count"), "interaction", "interactions")) " · " (n(&m, "critical_health")) " critical, " (n(&m, "recoverable_health")) " recoverable" }
-                    }
-                }
-                div.chips {
-                    @if let Some(u) = bot.i("uptime_seconds") { span.chip data-uptime { "up " (ui::uptime(u)) } }
-                    @if let Some(kb) = bot.i("memory_kb") { span.chip { (kb / 1024) " MB" } }
-                    @if let Some(age) = bot.f("heartbeat_age_seconds") { span.chip data-uptime { "heartbeat " (age as i64) "s ago" } }
-                }
-            }
-        };
-    }
-    let sess = best_session(bot);
-    let (tone, label) = badge(bot, sess);
-    let title = sess.and_then(|x| x.s("title")).filter(|t| !t.is_empty()).or_else(|| bot.s("error")).unwrap_or_else(|| "Waiting for live playback.".into());
-    let sub = sess.and_then(|x| x.s("media_source_label").or_else(|| x.s("session_state_label"))).unwrap_or_else(|| "Live state fills in automatically.".into());
-    let thumb = sess.and_then(|x| x.s("thumbnail")).filter(|t| ui::safe_url(t).is_some());
+    let orch = s(bot, "kind") == "orchestrator";
+    let sess = if orch { None } else { best_session(bot) };
+    let (tone, label) = if orch { if off { ("danger", "Offline") } else { ("live", "Online") } } else { badge(bot, sess) };
+    let playing = sess.is_some_and(|x| x.b("is_playing"));
+    let style = format!("--card-accent:{}{}", accent(ctx, &key), art_style(sess));
+    let title = sess.and_then(|x| x.s("title")).filter(|t| !t.is_empty());
+    let name = s(bot, "display_name");
     html! {
-        article.bot-card.is-offline[off] style=(style) data-bot=(key) {
-            header.bot-head {
-                span.bot-dot {}
-                div { h3 { (s(bot, "display_name")) } small { (bot.s("heartbeat_status").or(bot.s("status")).unwrap_or_else(|| "telemetry ready".into())) @if let Some(m) = bot.s("playback_mode") { " · " (m) } } }
+        button.tile.playing[playing].is-off[off].orch[orch].has-art[art_style(sess).len() > 0] type="button" style=(style) data-drawer=(format!("/frag/bot?key={}", urlencoding::encode(&key))) aria-label=(format!("{name}: {label}")) {
+            span.tile-art aria-hidden="true" { span.tile-mono { (name.chars().next().unwrap_or('?')) } }
+            span.tile-shade aria-hidden="true" {}
+            span.tile-top {
+                span.tile-name { span.bot-dot {} (name) }
                 (ui::pill(tone, label))
             }
-            div.bot-now {
-                @if let Some(t) = thumb { img.thumb src=(t) alt="" loading="lazy"; } @else { div.thumb.empty { (icon("note")) } }
-                div.bot-now-copy { strong { (title) } small.detail { (sub) } }
-            }
-            @if let Some(x) = sess { @if x.f("duration_seconds").unwrap_or(0.0) > 0.0 || x.b("is_playing") { (playback(x, Some((&key, &s(x, "guild_id"))))) } }
-            div.chips {
-                span.chip { (n(bot, "active_playing_count")) " live" }
-                span.chip { (n(bot, "known_guild_count")) " guilds" }
-                span.chip data-queue { (n(bot, "queue_depth")) " queued" }
-                span.chip data-queue { (n(bot, "backup_queue_depth")) " backup" }
-                @if let Some(age) = bot.f("heartbeat_age_seconds") { span.chip data-uptime { "heartbeat " (age as i64) "s ago" } }
+            span.tile-bottom {
+                @if orch {
+                    @let m = bot.get("medic_summary").cloned().unwrap_or(json!({}));
+                    strong.tile-title { "Swarm orchestrator" }
+                    span.tile-sub { (ui::plural(n(&m, "pending_repairs"), "repair", "repairs")) " pending · " (n(&m, "critical_health")) " critical" }
+                } @else {
+                    strong.tile-title { (title.clone().unwrap_or_else(|| if off { "Unreachable".into() } else { "Waiting for a song".into() })) }
+                    span.tile-sub {
+                        @if let Some(x) = sess { @if let Some(c) = x.s("channel_name") { "#" (c) " · " } }
+                        span data-queue { (compact(n(bot, "queue_depth"))) " queued" }
+                        @if n(bot, "active_playing_count") > 1 { " · " (n(bot, "active_playing_count")) " guilds live" }
+                    }
+                    @if let Some(x) = sess { @if x.f("duration_seconds").unwrap_or(0.0) > 0.0 { (playback(x, None)) } }
+                }
             }
         }
     }
@@ -121,77 +111,134 @@ fn bot_card(ctx: &Ctx, bot: &Value) -> Markup {
 
 pub async fn dashboard_frag(ctx: &Ctx) -> Markup {
     let data = ctx.live("dashboard", json!({})).await.unwrap_or_else(|_| json!({ "bots": [] }));
-    let bots = arr(&data, "bots");
-    let mut sessions: Vec<(String, &Value)> = Vec::new();
-    for b in bots {
-        for x in arr(b, "sessions") {
-            sessions.push((s(b, "display_name"), x));
-        }
-    }
-    let online = bots.iter().filter(|b| !offline(b)).count();
-    let live: Vec<&(String, &Value)> = sessions.iter().filter(|(_, x)| x.b("is_playing")).collect();
-    let music: Vec<&Value> = bots.iter().filter(|b| s(b, "kind") == "music").collect();
-    let total_q: i64 = bots.iter().map(|b| n(b, "queue_depth")).sum();
-    let total_b: i64 = bots.iter().map(|b| n(b, "backup_queue_depth")).sum();
-    let guilds: i64 = bots.iter().map(|b| n(b, "known_guild_count")).sum();
-    let busiest = music.iter().max_by_key(|b| n(b, "queue_depth"));
-    let aria = bots.iter().find(|b| s(b, "key") == "aria").map(|b| if offline(b) { "Offline".to_string() } else { b.s("status").unwrap_or_else(|| "Online".into()) });
-    let mut leaders: Vec<&&Value> = music.iter().filter(|b| n(b, "queue_depth") > 0).collect();
-    leaders.sort_by_key(|b| -n(b, "queue_depth"));
-    let shown: Vec<&(String, &Value)> = sessions.iter().filter(|(_, x)| x.b("is_playing") || x.b("is_paused") || x.s("title").is_some_and(|t| !t.is_empty())).collect();
+    let mut bots: Vec<&Value> = arr(&data, "bots").iter().collect();
+    // Playing first, then paused/idle, offline last; orchestrator at the end.
+    let rank = |b: &Value| -> i32 {
+        if s(b, "kind") == "orchestrator" { return 4 }
+        if offline(b) { return 3 }
+        match best_session(b) { Some(x) if x.b("is_playing") => 0, Some(x) if x.b("is_paused") => 1, _ => 2 }
+    };
+    bots.sort_by_key(|b| (rank(b), -n(b, "queue_depth")));
     html! {
-        section.overview {
-            div.spotlight {
-                div.spotlight-head {
-                    span.eyebrow { "Fleet overview" }
-                    (ui::pill(if live.is_empty() { "off" } else { "live" }, if live.is_empty() { "Idle" } else { "Active" }))
+        @if bots.is_empty() { (ui::empty("No bots are visible to this account yet.")) }
+        div.wall { @for b in &bots { (tile(ctx, b)) } }
+    }
+}
+
+/// Slide-over panel for one bot: every guild session with transport and seek.
+pub async fn bot_panel_frag(ctx: &Ctx) -> Markup {
+    let key = ctx.q("key").unwrap_or_default();
+    let data = crate::fleet::dashboard_payload(ctx.app(), &ctx.a, false).await;
+    let Some(bot) = arr(&data, "bots").iter().find(|b| s(b, "key") == key) else { return ui::empty("This bot isn't visible to your account.") };
+    let name = s(bot, "display_name");
+    let orch = s(bot, "kind") == "orchestrator";
+    let sess = arr(bot, "sessions");
+    let lead = best_session(bot);
+    let (tone, label) = if orch { if offline(bot) { ("danger", "Offline") } else { ("live", "Online") } } else { badge(bot, lead) };
+    let act = |x: &Value, action: &str| json!({ "bot_key": key, "guild_id": s(x, "guild_id"), "action": action, "payload": {} });
+    html! {
+        div.panel-hero style=(format!("--card-accent:{}{}", accent(ctx, &key), art_style(lead))) {
+            div.panel-art {}
+            div.panel-id {
+                span.kicker { @if orch { "Orchestrator" } @else { "Music bot" } }
+                h2 { (name) }
+                div.chips {
+                    (ui::pill(tone, label))
+                    @if let Some(m) = bot.s("playback_mode") { span.chip { (m) } }
+                    @if let Some(age) = bot.f("heartbeat_age_seconds") { span.chip data-uptime { "seen " (age as i64) "s ago" } }
+                    @if let Some(u) = bot.i("uptime_seconds") { span.chip data-uptime { "up " (ui::uptime(u)) } }
                 }
-                @if let Some((name, x)) = live.first() {
-                    div.now {
-                        @if let Some(t) = x.s("thumbnail").filter(|t| ui::safe_url(t).is_some()) { img.now-art src=(t) alt=""; } @else { div.now-art.empty { (icon("note")) } }
-                        div.now-copy {
-                            strong { (x.s("title").unwrap_or_else(|| "Now playing".into())) }
-                            small { (name) @if let Some(c) = x.s("channel_name") { " · #" (c) } }
-                            (playback(x, None))
+            }
+        }
+        @if orch {
+            @let m = bot.get("medic_summary").cloned().unwrap_or(json!({}));
+            div.stat-row {
+                (ui::metric("Pending repairs", n(&m, "pending_repairs"), None))
+                (ui::metric("Infra tasks", n(&m, "pending_infra"), None))
+                (ui::metric("Critical", n(&m, "critical_health"), None))
+                (ui::metric("Interactions", n(bot, "recent_interaction_count"), None))
+            }
+            @if ctx.a.is_admin() { a.btn.block href="/intel" { (icon("alert")) "Open incidents" } }
+        } @else {
+            div.stat-row {
+                (ui::metric("Live", n(bot, "active_playing_count"), None))
+                (ui::metric("Guilds", n(bot, "known_guild_count"), None))
+                (ui::metric("Queued", compact(n(bot, "queue_depth")), None))
+                (ui::metric("Backup", compact(n(bot, "backup_queue_depth")), None))
+            }
+            @if sess.is_empty() { (ui::empty("No sessions yet. Send it a PLAY from Controls.")) }
+            @for x in sorted_sessions(sess).into_iter().filter(|x| x.b("is_playing") || x.b("is_paused")) {
+                @let g = s(x, "guild_id");
+                section.session {
+                    div.session-head {
+                        @if let Some(t) = x.s("thumbnail").filter(|t| ui::safe_url(t).is_some()) { img.session-art src=(t) alt=""; } @else { div.session-art.empty { (icon("note")) } }
+                        div.session-copy {
+                            strong { (x.s("title").filter(|t| !t.is_empty()).unwrap_or_else(|| "Nothing playing".into())) }
+                            small { (x.s("channel_name").map(|c| format!("#{c}")).unwrap_or_else(|| format!("Guild {g}"))) " · " (s(x, "session_state_label")) " · " (n(x, "queue_count")) " queued" }
                         }
                     }
-                } @else {
-                    @match busiest {
-                        Some(b) if n(b, "queue_depth") > 0 => { strong.big { (s(b, "display_name")) " has the deepest queue" } p.muted { (n(b, "queue_depth")) " queued" } },
-                        _ => { strong.big { "The fleet is quiet right now" } p.muted { "Nothing is playing. Send an order from Controls." } },
+                    @if x.f("duration_seconds").unwrap_or(0.0) > 0.0 { (playback(x, Some((&key, &g)))) }
+                    div.transport {
+                        @if x.b("is_paused") { button.btn.sm type="button" data-post="/api/bots/control" data-body=(act(x, "RESUME")) data-ok="Resumed." data-done="refresh:#drawer-body" { (icon("play")) "Resume" } }
+                        @else { button.btn.sm type="button" data-post="/api/bots/control" data-body=(act(x, "PAUSE")) data-ok="Paused." data-done="refresh:#drawer-body" { (icon("pause")) "Pause" } }
+                        button.btn.sm type="button" data-post="/api/bots/control" data-body=(act(x, "SKIP")) data-ok="Skipped." data-done="refresh:#drawer-body" { (icon("skip")) "Skip" }
+                        button.btn.sm type="button" data-post="/api/bots/control" data-body=(act(x, "SHUFFLE")) data-ok="Shuffled." data-done="refresh:#drawer-body" { "Shuffle" }
+                        a.btn.sm href=(format!("/controls?bot={}&guild={}", urlencoding::encode(&key), urlencoding::encode(&g))) { "More…" }
                     }
                 }
             }
-            div.metrics {
-                (ui::metric("Bots online", format!("{online} / {}", bots.len()), Some("heartbeat within 120s")))
-                (ui::metric("Live sessions", live.len(), Some("currently playing")))
-                (ui::metric("Queue depth", total_q, Some(&format!("{total_b} in backup"))))
-                (ui::metric("Guilds served", guilds, Some("across the fleet")))
-                @if let Some(st) = &aria { (ui::metric("Aria", st, Some("orchestrator"))) }
+            @for x in sess.iter().filter(|x| !(x.b("is_playing") || x.b("is_paused"))) {
+                @let g = s(x, "guild_id");
+                a.session.idle href=(format!("/controls?bot={}&guild={}", urlencoding::encode(&key), urlencoding::encode(&g))) {
+                    span.session-copy { strong { (x.s("channel_name").map(|c| format!("#{c}")).unwrap_or_else(|| format!("Guild {g}"))) } small { "Idle · " (n(x, "queue_count")) " queued" } }
+                    span.chip { "Open" }
+                }
             }
-        }
-        @if !leaders.is_empty() {
-            div.leaders {
-                span.eyebrow { "Queue leaders" }
-                @for b in leaders.iter().take(4) { span.leader style=(format!("--card-accent:{}", accent(ctx, &s(b, "key")))) { span.bot-dot {} (s(b, "display_name")) b { (n(b, "queue_depth")) } } }
-            }
-        }
-        (ui::section("Bots", Some(&format!("{} bots · {} online", bots.len(), online)), None))
-        div.bot-grid { @for b in bots { (bot_card(ctx, b)) } }
-        (ui::section("Live sessions", None, None))
-        @if shown.is_empty() { (ui::empty("Nothing playing right now.")) } @else {
-            div.table-wrap { table.table {
-                thead { tr { th { "Bot" } th { "Track" } th { "State" } th.w-pos { "Position" } th.num { "Queue" } } }
-                tbody { @for (name, x) in &shown { tr {
-                    td { strong { (name) } @if let Some(c) = x.s("channel_name") { br; small.muted { "#" (c) } } }
-                    td { (x.s("title").unwrap_or_else(|| "—".into())) }
-                    td { (ui::pill(if x.b("is_playing") { "live" } else if x.b("is_paused") { "soft" } else { "off" }, &s(x, "session_state_label"))) }
-                    td { (playback(x, None)) }
-                    td.num { (n(x, "queue_count")) }
-                } } }
-            } }
+            a.btn.primary.block href=(format!("/controls?bot={}", urlencoding::encode(&key))) { (icon("play")) "Open in Controls" }
         }
     }
+}
+
+fn sorted_sessions(sess: &[Value]) -> Vec<&Value> {
+    let mut v: Vec<&Value> = sess.iter().collect();
+    v.sort_by_key(|x| if x.b("is_playing") { 0 } else if x.b("is_paused") { 1 } else { 2 });
+    v
+}
+
+/// Totals for the live strip under the command bar (scoped to what the viewer may see).
+fn status_counts(data: &Value) -> (usize, usize, usize, i64, i64) {
+    let bots = arr(data, "bots");
+    let online = bots.iter().filter(|b| !offline(b)).count();
+    let playing = bots.iter().flat_map(|b| arr(b, "sessions")).filter(|x| x.b("is_playing")).count();
+    let queued: i64 = bots.iter().map(|b| n(b, "queue_depth")).sum();
+    let guilds: i64 = bots.iter().map(|b| n(b, "known_guild_count")).sum();
+    (bots.len(), online, playing, queued, guilds)
+}
+
+fn status_markup(data: Option<&Value>) -> Markup {
+    let Some(d) = data else { return html! { span.status-item.muted { span.live-dot {} "Syncing with the swarm…" } } };
+    let (total, online, playing, queued, guilds) = status_counts(d);
+    let all_up = online == total;
+    html! {
+        span.status-item { span.live-dot.warn[!all_up] {} b { (online) "/" (total) } " online" }
+        span.status-item { span.eq.still[playing == 0] aria-hidden="true" { i {} i {} i {} i {} } b { (playing) } " playing" }
+        span.status-item { b { (compact(queued)) } " queued" }
+        span.status-item.hide-sm { b { (guilds) } " guilds" }
+    }
+}
+
+/// Sync version for first paint: uses the dashboard cache if it's warm.
+pub fn status_line(ctx: &Ctx) -> Markup {
+    let raw = ctx.app().cache.dashboard.get("snap", std::time::Duration::from_secs(120));
+    match (raw, crate::app::scoped_guild_id(&ctx.a)) {
+        (Some(d), None) => status_markup(Some(&d)),
+        _ => status_markup(None),
+    }
+}
+
+pub async fn status_line_frag(ctx: &Ctx) -> Markup {
+    let data = crate::fleet::dashboard_payload(ctx.app(), &ctx.a, false).await;
+    status_markup(Some(&data))
 }
 
 pub fn event_card(e: &Value) -> Markup {
@@ -227,11 +274,13 @@ pub async fn dashboard(req: Req) -> R<Reply> {
     let body = html! {
         div #dash data-src="/frag/dashboard" data-live="dashboard" { (dashboard_frag(&ctx).await) }
         @if ctx.a.is_admin() {
-            (ui::section("Incidents", Some("Latest bot errors and Aria Medic events."), Some(html! { a.btn href="/intel" { "Open Intel" } })))
-            div #dash-events data-src="/frag/events" data-live="events" { (events_frag(&ctx).await) }
+            section.feed {
+                div.feed-head { h2 { "Incidents" } a.link-btn href="/intel" { "All events →" } }
+                div #dash-events data-src="/frag/events" data-live="events" { (events_frag(&ctx).await) }
+            }
         }
     };
-    Ok(render(&ctx, Page::new(path, "Dashboard", "Live status across the swarm.", body)))
+    Ok(render(&ctx, Page::new(path, "Live wall", "Every bot, live. Tap one to steer it.", body)))
 }
 
 // ---- Controls ------------------------------------------------------------------------------------
@@ -372,10 +421,18 @@ pub async fn controls(req: Req) -> R<Reply> {
     };
 
     let body = html! {
+        nav.bot-strip aria-label="Choose a bot" {
+            @for b in &bots {
+                @let k = s(b, "key");
+                @let x = best_session(b);
+                a.bot-chip.here[k == bot_key].playing[x.is_some_and(|x| x.b("is_playing"))].is-off[offline(b)].has-art[!art_style(x).is_empty()] href=(format!("/controls?bot={}", urlencoding::encode(&k))) style=(format!("--card-accent:{}{}", accent(&ctx, &k), art_style(x))) aria-current=[(k == bot_key).then_some("true")] {
+                    span.chip-art { span { (s(b, "display_name").chars().next().unwrap_or('?')) } }
+                    span.chip-name { (s(b, "display_name")) }
+                }
+            }
+        }
         form.target-bar method="get" action="/controls" data-autosubmit {
-            label.field { span { "Bot" } select name="bot" {
-                @for b in &bots { option value=(s(b, "key")) selected[s(b, "key") == bot_key] { (s(b, "display_name")) @if let Some(m) = b.s("playback_mode") { " (" (m) ")" } } }
-            } }
+            input type="hidden" name="bot" value=(bot_key);
             label.field { span { "Guild" }
                 @if let Some(g) = &own { select name="guild" { option value=(g) selected { (guild_name) } } }
                 @else { select name="guild" {
