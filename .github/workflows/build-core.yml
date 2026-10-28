@@ -1,0 +1,46 @@
+name: Build Rust core (Apple)
+
+# Cross-compiles rust/core for iOS + tvOS and packages SwarmPanelCore.xcframework
+# (the same step the app workflows run before XcodeGen).
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'rust/core/**'
+      - 'rust/Cargo.lock'
+      - 'ios/scripts/build-core.sh'
+      - '.github/workflows/build-core.yml'
+  workflow_dispatch:
+
+jobs:
+  core:
+    name: Build SwarmPanelCore.xcframework
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          XCODE=$(ls /Applications | grep '^Xcode' | sort -rV | head -1)
+          sudo xcode-select -s "/Applications/$XCODE/Contents/Developer"
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-core-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: rust-core-${{ runner.os }}-
+
+      - name: Build core
+        run: ios/scripts/build-core.sh
+
+      - name: Upload RustCore
+        uses: actions/upload-artifact@v4
+        with:
+          name: RustCore
+          path: ios/RustCore
+          retention-days: 7

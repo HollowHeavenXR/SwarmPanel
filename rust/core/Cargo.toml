@@ -1,0 +1,32 @@
+[package]
+name = "swarmpanel-core"
+version = "2.0.0"
+edition = "2024"
+description = "SwarmPanel app core (networking, live socket, models, session, telemetry) for the Swift apps"
+
+[lib]
+name = "swarmpanel_core"
+crate-type = ["lib", "staticlib", "cdylib"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+required-features = ["bindgen"]
+
+[features]
+bindgen = ["uniffi/cli"]
+
+[dependencies]
+uniffi = { version = "=0.28.3" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "net"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
+tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
+futures-util = "0.3"
+urlencoding = "2"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+uuid = { version = "1", features = ["v4"] }
+url = "2"
+

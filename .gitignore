@@ -37,3 +37,7 @@ ios/DerivedData/lua/result
 backup-*/
 *.bak-*
 *.pre-*
+
+# Rust core build output (ios/scripts/build-core.sh)
+ios/RustCore/
+rust/core/generated/

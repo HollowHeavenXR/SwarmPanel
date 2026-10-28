@@ -1,0 +1,11 @@
+[bindings.swift]
+module_name = "SwarmPanelCore"
+ffi_module_name = "SwarmPanelCoreFFI"
+ffi_module_filename = "SwarmPanelCoreFFI"
+
+# Rust i64 counts/ids surface in Swift as plain `Int` (not Int64) so SwiftUI
+# views can keep doing ordinary Int arithmetic.
+[bindings.swift.custom_types.SwiftInt]
+type_name = "Int"
+into_custom = "Int({})"
+from_custom = "Int64({})"
