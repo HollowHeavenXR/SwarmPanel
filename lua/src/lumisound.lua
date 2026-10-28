@@ -10,7 +10,13 @@ local admin_browser = require("admin_browser")
 
 local M = {}
 
-local function schema(settings) return settings.db_default_schema end
+-- 2026-10-26: Lumisound's live data is written by the iOS bridge on this PC,
+-- while the GWS bot's own data in the same-named database stays on Mel -- so
+-- Lumisound gets its own "lumisound" route (PANEL_DB_ROUTES) when configured.
+local function schema(settings)
+  if settings.db_routes and settings.db_routes.lumisound then return "lumisound" end
+  return settings.db_default_schema
+end
 
 function M.get_lumisound_admin_data(settings, limit)
   local sch = schema(settings)

@@ -156,6 +156,21 @@ function M.load()
     db_pool_size_main = math.max(1, tonumber(M.env("PANEL_DB_POOL_SIZE_MAIN", "4")) or 4),
     db_pool_size = math.max(1, tonumber(M.env("PANEL_DB_POOL_SIZE", "2")) or 2),
     db_default_schema = M.env("PANEL_DB_DEFAULT_SCHEMA", "discord_music_gws"),
+    -- 2026-10-26: the fleet is split across two hosts, so some databases live
+    -- on this PC's own Postgres instead of Mel's. PANEL_DB_ROUTES maps a
+    -- database name (or an alias such as "lumisound") to host:port[/dbname]:
+    --   PANEL_DB_ROUTES=discord_music_rhythm=127.0.0.1:5432,lumisound=127.0.0.1:5432/discord_music_gws
+    -- Anything not listed keeps using db_host/db_port.
+    db_routes = (function()
+      local routes = {}
+      for item in M.env("PANEL_DB_ROUTES", ""):gmatch("[^,%s]+") do
+        local key, host, port, dbname = item:match("^([%w_%-]+)=([^:/]+):(%d+)/?([%w_%-]*)$")
+        if key then
+          routes[key] = { host = host, port = tonumber(port), database = (dbname ~= "" and dbname) or nil }
+        end
+      end
+      return routes
+    end)(),
     admin_username = M.env("PANEL_ADMIN_USERNAME", "admin"),
     admin_password = M.env("PANEL_ADMIN_PASSWORD", ""),
     -- 2026-10-21: shared fleet-wide across both hosts (Mel + this one) --

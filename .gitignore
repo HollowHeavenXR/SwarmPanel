@@ -32,3 +32,8 @@ ios/build/
 ios/ExportOptions.plist
 ios/.build/
 ios/DerivedData/lua/result
+
+# local backups (may contain secrets)
+backup-*/
+*.bak-*
+*.pre-*

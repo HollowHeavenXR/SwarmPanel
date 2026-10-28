@@ -38,12 +38,14 @@ function M.conn(dbname)
   local pool = pools[dbname]
   if not pool then
     local size = (dbname == "accountlogins") and cfg.db_pool_size_main or cfg.db_pool_size
+    -- PANEL_DB_ROUTES (config.lua): some databases live on another host.
+    local route = (cfg.db_routes or {})[dbname] or {}
     pool = Pool.new({
-      host = cfg.db_host,
-      port = cfg.db_port,
+      host = route.host or cfg.db_host,
+      port = route.port or cfg.db_port,
       user = cfg.db_user,
       password = cfg.db_password,
-      database = dbname,
+      database = route.database or dbname,
       size = size or 1,
       on_connect = on_connect,
     })
