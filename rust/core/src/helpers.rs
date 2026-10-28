@@ -427,6 +427,61 @@ pub fn widget_snapshot(dashboard: DashboardResponse, guild_id: Option<String>) -
     }
 }
 
+#[derive(uniffi::Record, Clone, Debug, Default, PartialEq)]
+pub struct GuildOverlap {
+    pub guild_id: String,
+    pub guild_label: String,
+    pub bot_labels: Vec<String>,
+}
+
+/// Guilds served by more than one bot (Fleet Topology).
+#[uniffi::export]
+pub fn fleet_overlaps(dashboard: DashboardResponse) -> Vec<GuildOverlap> {
+    let mut by: std::collections::BTreeMap<String, (String, Vec<String>)> = Default::default();
+    for b in dashboard.bots.unwrap_or_default() {
+        let bot = b.display_name.clone().filter(|d| !d.is_empty()).unwrap_or(b.key.clone());
+        for s in b.sessions.unwrap_or_default() {
+            let Some(g) = s.guild_id.clone() else { continue };
+            let e = by.entry(g.clone()).or_insert_with(|| (s.guild_name.clone().unwrap_or(format!("Guild {g}")), vec![]));
+            if !e.1.contains(&bot) {
+                e.1.push(bot.clone());
+            }
+        }
+    }
+    let mut out: Vec<GuildOverlap> = by
+        .into_iter()
+        .filter(|(_, (_, bots))| bots.len() > 1)
+        .map(|(g, (label, mut bots))| {
+            bots.sort();
+            GuildOverlap { guild_id: g, guild_label: label, bot_labels: bots }
+        })
+        .collect();
+    out.sort_by(|a, b| a.guild_label.cmp(&b.guild_label));
+    out
+}
+
+/// Sessions stuck in "recovering" (bot + session pairs).
+#[uniffi::export]
+pub fn find_recoverable_sessions(dashboard: DashboardResponse) -> Vec<OwnSession> {
+    let mut out = Vec::new();
+    for b in dashboard.bots.unwrap_or_default() {
+        for s in b.sessions.clone().unwrap_or_default() {
+            if s.session_state.as_deref() == Some("recovering") && s.guild_id.is_some() {
+                out.push(OwnSession { bot: b.clone(), session: s });
+            }
+        }
+    }
+    out
+}
+
+/// "3 succeeded, 1 failed." for a bulk account action.
+#[uniffi::export]
+pub fn bulk_summary(result: SwarmAccountBulkResult) -> String {
+    let ok = result.succeeded.map(|v| v.len()).unwrap_or(0);
+    let failed = result.failed.map(|v| v.len()).unwrap_or(0);
+    if failed > 0 { format!("{ok} succeeded, {failed} failed.") } else { format!("{ok} succeeded.") }
+}
+
 /// Discord channel type codes 2/13 are voice/stage.
 #[uniffi::export]
 pub fn is_voice_channel(channel_type: Option<SwiftInt>) -> bool {

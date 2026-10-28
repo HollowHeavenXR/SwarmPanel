@@ -24,17 +24,17 @@ final class AccountSecurityViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var statusMessage: String?
 
-    private let api = APIClient.shared
+    private let core = Core.shared
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response: MeResponse = try await api.get("/api/users/me")
+            let response = try await core.me()
             apply(response.profile)
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load account details."
+            errorMessage = error.message("Failed to load account details.")
         }
     }
 
@@ -53,10 +53,7 @@ final class AccountSecurityViewModel: ObservableObject {
             return
         }
         await run("Password changed.") { [self] in
-            let envelope: MeProfileEnvelope = try await api.post(
-                "/api/session/password",
-                body: PasswordChangeBody(currentPassword: currentPassword, newPassword: newPassword)
-            )
+            let envelope = try await core.changePassword(currentPassword: currentPassword, newPassword: newPassword)
             apply(envelope.profile)
             currentPassword = ""
             newPassword = ""
@@ -69,7 +66,7 @@ final class AccountSecurityViewModel: ObservableObject {
             return
         }
         await run("Email updated.") { [self] in
-            let envelope: MeProfileEnvelope = try await api.post("/api/session/email", body: EmailChangeBody(email: email))
+            let envelope = try await core.changeEmail(email: email)
             apply(envelope.profile)
         }
     }
@@ -79,10 +76,7 @@ final class AccountSecurityViewModel: ObservableObject {
     /// never being sent for a non-empty one.
     func saveWebhook() async {
         await run(nil) { [self] in
-            let response: VerificationSendResponse = try await api.post(
-                "/api/session/verification-webhook",
-                body: VerificationWebhookBody(verificationWebhookUrl: verificationWebhookUrl)
-            )
+            let response = try await core.setVerificationWebhook(url: verificationWebhookUrl)
             apply(response.profile)
             statusMessage = response.verificationSent == true ? "Code sent to your webhook." : "Saved."
         }
@@ -90,10 +84,7 @@ final class AccountSecurityViewModel: ObservableObject {
 
     func saveDiscordUserId() async {
         await run(nil) { [self] in
-            let response: VerificationSendResponse = try await api.post(
-                "/api/session/verification-discord",
-                body: VerificationDiscordBody(discordUserId: discordUserId)
-            )
+            let response = try await core.setVerificationDiscord(discordUserId: discordUserId)
             apply(response.profile)
             statusMessage = response.verificationSent == true ? "Code sent via Discord DM." : "Saved."
         }
@@ -105,10 +96,7 @@ final class AccountSecurityViewModel: ObservableObject {
             return
         }
         await run("Verified.") { [self] in
-            let envelope: MeProfileEnvelope = try await api.post(
-                "/api/session/verification/verify",
-                body: VerificationCodeBody(code: verificationCode)
-            )
+            let envelope = try await core.verifyCode(code: verificationCode)
             apply(envelope.profile)
             verificationCode = ""
         }
@@ -116,7 +104,7 @@ final class AccountSecurityViewModel: ObservableObject {
 
     func resendCode() async {
         await run(nil) { [self] in
-            let response: ResendVerificationResponse = try await api.post("/api/session/resend-verification")
+            let response = try await core.resendVerification()
             if response.alreadyVerified == true {
                 statusMessage = "Already verified."
             } else if response.verificationSent == true {
@@ -138,7 +126,7 @@ final class AccountSecurityViewModel: ObservableObject {
             Haptics.success()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Request failed."
+            errorMessage = error.message("Request failed.")
             Haptics.error()
         }
     }

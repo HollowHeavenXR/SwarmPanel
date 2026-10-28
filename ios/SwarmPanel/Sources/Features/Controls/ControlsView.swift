@@ -381,21 +381,22 @@ struct ControlsView: View {
 
 /// Icon for each order, shared by the action grid and the send button.
 func actionIcon(_ action: ControlAction) -> String {
-    switch action {
-    case .play: return "play.fill"
-    case .smartRecommend: return "wand.and.stars"
-    case .pause: return "pause.fill"
-    case .resume: return "playpause.fill"
-    case .skip: return "forward.fill"
-    case .stop: return "stop.fill"
-    case .clear: return "xmark.bin.fill"
-    case .resetQueue: return "arrow.counterclockwise"
-    case .shuffle: return "shuffle"
-    case .loop: return "repeat"
-    case .filter: return "slider.horizontal.3"
-    case .leave: return "rectangle.portrait.and.arrow.right"
-    case .setHome: return "house.fill"
-    case .recover: return "cross.case.fill"
+    switch action.rawValue {
+    case "PLAY": return "play.fill"
+    case "SMART_RECOMMEND": return "wand.and.stars"
+    case "PAUSE": return "pause.fill"
+    case "RESUME": return "playpause.fill"
+    case "SKIP": return "forward.fill"
+    case "STOP": return "stop.fill"
+    case "CLEAR": return "xmark.bin.fill"
+    case "RESET_QUEUE": return "arrow.counterclockwise"
+    case "SHUFFLE": return "shuffle"
+    case "LOOP": return "repeat"
+    case "FILTER": return "slider.horizontal.3"
+    case "LEAVE": return "rectangle.portrait.and.arrow.right"
+    case "SET_HOME": return "house.fill"
+    case "RECOVER": return "cross.case.fill"
+    default: return "bolt.fill"
     }
 }
 

@@ -1,12 +1,13 @@
 import Foundation
 
+/// Controls screen state. Payload building/validation, the command preview,
+/// guild picking and conversion summaries come from the Rust core.
 @MainActor
 final class ControlsViewModel: ObservableObject {
     @Published var bots: [BotSummary] = []
     @Published var guilds: [InventoryGuild] = []
     @Published var savedQueues: [SavedQueue] = []
     @Published var controlState: ControlStateSession?
-
     @Published var selectedBotKey: String = ""
     @Published var guildId: String = ""
     @Published var voiceChannelId: String = ""
@@ -14,107 +15,57 @@ final class ControlsViewModel: ObservableObject {
     @Published var sourceURL: String = ""
     @Published var loopMode: String = "queue"
     @Published var filterMode: String = "none"
-
     @Published var guildOverview: [ControlMatrixBot] = []
     @Published var guildOverviewGuildId: String?
     @Published var isLoadingOverview = false
     @Published var isConverting = false
-
     @Published var isLoadingBots = true
     @Published var isSending = false
     @Published var errorMessage: String?
     @Published var statusMessage: String?
 
-    private let api = APIClient.shared
+    private let core = Core.shared
     private let socket = SwarmLiveSocket.shared
 
     var voiceChannels: [InventoryChannel] {
         guilds.first(where: { $0.id == guildId })?.channels?.filter(\.isVoice) ?? []
     }
 
-    /// Plain-language readout of exactly what Send Control will do, kept in
-    /// sync with every @Published field above since it's a computed
-    /// property -- mirrors the web panel's command-preview readout on the
-    /// same Controls page.
     var commandPreviewSummary: String {
         let botLabel = bots.first(where: { $0.key == selectedBotKey })?.label ?? selectedBotKey
         let guild = guilds.first(where: { $0.id == guildId })
         let guildLabel = guild?.name?.isEmpty == false ? guild!.name! : "guild \(guildId)"
-        var detail = ""
-        if action == .play, !sourceURL.isEmpty {
-            detail = " with \"\(sourceURL)\""
-        } else if action == .loop {
-            detail = " (\(loopMode))"
-        } else if action == .filter {
-            detail = " (\(filterMode))"
-        }
-        return "\(botLabel) will run \(action.rawValue)\(detail) in \(guildLabel)."
+        return commandPreview(botLabel: botLabel, guildLabel: guildLabel, action: action.rawValue,
+                              sourceUrl: sourceURL, loopMode: loopMode, filterMode: filterMode)
     }
 
     func loadBots(defaultGuildId: String?) async {
         isLoadingBots = true
         defer { isLoadingBots = false }
         do {
-            let response: BotsResponse = try await api.get("/api/bots")
-            bots = (response.bots ?? []).filter { $0.kind == "music" }
+            bots = (try await core.bots().bots ?? []).filter { $0.kind == "music" }
             if selectedBotKey.isEmpty { selectedBotKey = bots.first?.id ?? "" }
-            if guildId.isEmpty, let defaultGuildId, !defaultGuildId.isEmpty {
-                guildId = defaultGuildId
-            }
+            if guildId.isEmpty, let defaultGuildId, !defaultGuildId.isEmpty { guildId = defaultGuildId }
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load bots."
+            errorMessage = error.message("Failed to load bots.")
         }
     }
 
-    /// Switching bots left guildId pointed at whatever guild the PREVIOUS
-    /// bot defaulted to — loadInventory()/loadControlStateAndQueues() still
-    /// succeed against that guild (it's a real guild, just not one the
-    /// newly selected bot serves), so the Guild ID/Voice channel/Text
-    /// channel fields all stayed frozen on the old bot's values no matter
-    /// which bot was picked, with nothing but a small inline error message
-    /// (easy to miss while scrolling) hinting anything was wrong. Re-picks
-    /// a guild the newly selected bot actually has a live session in
-    /// before refreshing inventory/control-state, mirroring the same fix
-    /// already shipped on the web panel's /controls page.
     func botDidChange() async {
-        if let guild = await pickGuildForBot(selectedBotKey) {
+        if !selectedBotKey.isEmpty, let dashboard = try? await core.dashboard(),
+           let guild = pickGuildForBot(dashboard: dashboard, botKey: selectedBotKey) {
             guildId = guild
-            // The old voiceChannelId belonged to the previous bot/guild
-            // pair — clearing it lets loadControlStateAndQueues()'s
-            // fill-if-empty pick the NEW bot's actual home channel instead
-            // of silently carrying over a channel ID that may not even
-            // exist in the new guild.
             voiceChannelId = ""
         }
         await loadInventory()
         await loadControlStateAndQueues()
     }
 
-    private func pickGuildForBot(_ botKey: String) async -> String? {
-        guard !botKey.isEmpty else { return nil }
-        do {
-            let dashboard: DashboardResponse = try await api.get("/api/dashboard")
-            guard let bot = dashboard.bots?.first(where: { $0.key == botKey }) else { return nil }
-            let sessions = bot.sessions ?? []
-            let live = sessions.first(where: { $0.isPlaying == true }) ?? sessions.first
-            guard let guild = live?.guildId, !guild.isEmpty else { return nil }
-            return guild
-        } catch {
-            return nil
-        }
-    }
-
     func loadInventory() async {
         guard !selectedBotKey.isEmpty else { guilds = []; return }
         do {
-            let response: BotInventoryResponse = try await api.get("/api/bots/\(selectedBotKey)/inventory")
-            guilds = response.guilds ?? []
-            // A guild with no channels listed (Discord fetch failed or this
-            // bot's account is in enough guilds that ours fell outside the
-            // Discord API's page) isn't a "channels are empty" state — it's
-            // "we couldn't confirm channels," so the picker's fallback text
-            // field (bound to the same voiceChannelId) stays the only way in.
+            guilds = try await core.botInventory(botKey: selectedBotKey).guilds ?? []
             if let matched = guilds.first(where: { $0.id == guildId }), let channelsError = matched.channelsError {
                 errorMessage = "Couldn't load channels: \(channelsError). Enter the voice channel ID manually below."
             } else if !guildId.isEmpty, !guilds.contains(where: { $0.id == guildId }) {
@@ -123,24 +74,16 @@ final class ControlsViewModel: ObservableObject {
         } catch {
             guard !error.isCancellation else { return }
             guilds = []
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load bot inventory."
+            errorMessage = error.message("Failed to load bot inventory.")
         }
     }
 
-    /// Registers/replaces the live-push watch for the current bot+guild so
-    /// control state (queue, now-playing, loop/filter mode) stays current
-    /// between explicit loads -- mirrors the web Controls page's
-    /// window.swarmLive.watch("control_state", {bot_key, guild_id}).
     private func watchLiveControlState() {
         guard !selectedBotKey.isEmpty, !guildId.isEmpty else {
             socket.unwatch("control_state")
             return
         }
-        socket.watch(
-            "control_state",
-            params: ["bot_key": selectedBotKey, "guild_id": guildId],
-            as: ControlStateResponse.self
-        ) { [weak self] result in
+        socket.watch("control_state", params: ["bot_key": selectedBotKey, "guild_id": guildId], as: ControlStateResponse.self) { [weak self] result in
             guard let self, case .success(let state) = result else { return }
             self.controlState = state.session
         }
@@ -155,160 +98,87 @@ final class ControlsViewModel: ObservableObject {
         guard !selectedBotKey.isEmpty, !guildId.isEmpty else { return }
         watchLiveControlState()
         do {
-            let state: ControlStateResponse = try await api.get(
-                "/api/bots/\(selectedBotKey)/control-state",
-                query: ["guild_id": guildId]
-            )
-            controlState = state.session
+            let session = try await core.controlState(botKey: selectedBotKey, guildId: guildId).session
+            controlState = session
             errorMessage = nil
-            // Fill-if-empty, matching the web panel's Controls page — never
-            // clobbers a voice channel the operator is mid-picking for a
-            // PLAY/SET_HOME order, but this was previously never wired up
-            // at all here, so the field just started (and stayed) blank
-            // every time until you knew to open the picker and pick the
-            // bot's actual home channel yourself.
-            if voiceChannelId.isEmpty {
-                let homeChannel = state.session?.homeChannelId ?? state.session?.channelId
-                if let homeChannel, !homeChannel.isEmpty { voiceChannelId = homeChannel }
+            if voiceChannelId.isEmpty, let home = session?.homeChannelId ?? session?.channelId, !home.isEmpty {
+                voiceChannelId = home
             }
-            if let loop = state.session?.loopMode, !loop.isEmpty { loopMode = loop }
-            if let filter = state.session?.filterMode, !filter.isEmpty { filterMode = filter }
+            if let loop = session?.loopMode, !loop.isEmpty { loopMode = loop }
+            if let filter = session?.filterMode, !filter.isEmpty { filterMode = filter }
         } catch {
             controlState = nil
-            if !error.isCancellation {
-                errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load current session."
-            }
+            if !error.isCancellation { errorMessage = error.message("Failed to load current session.") }
         }
-        do {
-            let queues: SavedQueuesResponse = try await api.get(
-                "/api/queues",
-                query: ["guild_id": guildId, "bot_key": selectedBotKey]
-            )
-            savedQueues = queues.queues ?? []
-        } catch {
-            savedQueues = []
-        }
+        savedQueues = (try? await core.savedQueues(guildId: guildId, botKey: selectedBotKey).queues) ?? []
     }
 
     func sendAction() async {
         guard !selectedBotKey.isEmpty, !guildId.isEmpty else { return }
-        // SET_HOME has no sane default for an empty channel (unlike PLAY,
-        // where the backend falls back to the bot's configured home
-        // channel) -- the backend now correctly 400s a blank one instead of
-        // silently writing an invalid home channel, so catch it locally
-        // first with a clear message rather than spending a round trip to
-        // learn the same thing, matching loadSavedQueue's existing pattern.
-        if action == .setHome, voiceChannelId.isEmpty {
-            errorMessage = "Select a voice channel before setting the home channel."
-            return
-        }
-        isSending = true
         statusMessage = nil
         errorMessage = nil
-        defer { isSending = false }
-
-        var payload: [String: String] = [:]
-        switch action {
-        case .play:
-            payload["source_url"] = sourceURL
-            payload["voice_channel_id"] = voiceChannelId
-        case .setHome, .smartRecommend:
-            payload["voice_channel_id"] = voiceChannelId
-        case .loop:
-            payload["loop_mode"] = loopMode
-        case .filter:
-            payload["filter_mode"] = filterMode
-        default:
-            break
-        }
-
         do {
-            let _: OKResponse = try await api.post(
-                "/api/bots/control",
-                body: BotControlRequest(botKey: selectedBotKey, guildId: guildId, action: action.rawValue, payload: payload)
-            )
+            let payload = try controlPayload(action: action.rawValue, sourceUrl: sourceURL, voiceChannelId: voiceChannelId,
+                                             loopMode: loopMode, filterMode: filterMode)
+            isSending = true
+            defer { isSending = false }
+            _ = try await core.control(botKey: selectedBotKey, guildId: guildId, action: action.rawValue, payload: payload)
             statusMessage = "\(action.label) sent."
             Haptics.success()
             await loadControlStateAndQueues()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Control action failed."
+            errorMessage = error.message("Control action failed.")
             Haptics.error()
         }
     }
 
     func saveCurrentQueue(name: String) async {
-        guard let items = controlState?.queuePreview, !items.isEmpty else {
-            errorMessage = "The live queue is empty — nothing to save."
-            return
-        }
         do {
-            let _: SavedQueueEnvelope = try await api.post(
-                "/api/queues",
-                body: SavedQueueCreateBody(guildId: guildId, botKey: selectedBotKey, name: name.isEmpty ? "Saved Queue" : name, items: items)
-            )
+            _ = try await core.saveQueue(guildId: guildId, botKey: selectedBotKey, name: name, items: controlState?.queuePreview ?? [])
             statusMessage = "Queue saved."
             Haptics.success()
             await loadControlStateAndQueues()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to save queue."
+            errorMessage = error.message("Failed to save queue.")
             Haptics.error()
         }
     }
 
     func loadSavedQueue(_ queue: SavedQueue) async {
-        guard !voiceChannelId.isEmpty else {
-            errorMessage = "Select a voice channel before loading a saved queue."
-            return
-        }
         isSending = true
         defer { isSending = false }
-        for item in queue.items ?? [] {
-            do {
-                let _: OKResponse = try await api.post(
-                    "/api/bots/control",
-                    body: BotControlRequest(
-                        botKey: selectedBotKey, guildId: guildId, action: "PLAY",
-                        payload: ["source_url": item.videoUrl, "voice_channel_id": voiceChannelId]
-                    )
-                )
-            } catch {
-                guard !error.isCancellation else { return }
-                errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load queue."
-                return
-            }
+        do {
+            let outcome = try await core.loadSavedQueue(botKey: selectedBotKey, guildId: guildId, voiceChannelId: voiceChannelId, queue: queue)
+            statusMessage = outcome.message
+            Haptics.success()
+        } catch {
+            guard !error.isCancellation else { return }
+            errorMessage = error.message("Failed to load queue.")
         }
-        statusMessage = "Queued \(queue.itemCount) track(s) from \"\(queue.name)\"."
-        Haptics.success()
     }
 
     func deleteSavedQueue(_ queue: SavedQueue) async {
         do {
-            let _: OKResponse = try await api.post("/api/queues/\(queue.id)/delete", body: SavedQueueDeleteBody(guildId: guildId))
+            _ = try await core.deleteSavedQueue(queueId: queue.id, guildId: guildId)
             await loadControlStateAndQueues()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to delete queue."
+            errorMessage = error.message("Failed to delete queue.")
         }
     }
 
     func renameSavedQueue(_ queue: SavedQueue, to newName: String) async {
-        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
         do {
-            let _: SavedQueueEnvelope = try await api.post("/api/queues/\(queue.id)/rename", body: SavedQueueRenameBody(guildId: guildId, name: trimmed))
+            _ = try await core.renameSavedQueue(queueId: queue.id, guildId: guildId, name: newName)
             await loadControlStateAndQueues()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to rename queue."
+            errorMessage = error.message("Failed to rename queue.")
         }
     }
-    // MARK: - Guild overview
 
-    /// Every music bot's state in the selected guild, on demand -- mirrors
-    /// the web Controls page's Guild Overview. Not live-pushed: each load
-    /// resolves channel names through Discord for every bot.
     func loadGuildOverview() async {
         guard !guildId.isEmpty else {
             errorMessage = "Choose a guild before loading the overview."
@@ -318,74 +188,46 @@ final class ControlsViewModel: ObservableObject {
         isLoadingOverview = true
         defer { isLoadingOverview = false }
         do {
-            let response: ControlMatrixResponse = try await api.get("/api/guilds/\(target)/control-matrix")
-            guildOverview = response.bots ?? []
+            guildOverview = try await core.controlMatrix(guildId: target).bots ?? []
             guildOverviewGuildId = target
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load the guild overview."
+            errorMessage = error.message("Failed to load the guild overview.")
         }
     }
 
-    /// Quick transport action (PAUSE / RESUME / SKIP) on one overview row,
-    /// against the guild the overview was loaded for.
     func sendOverviewAction(_ action: String, to bot: ControlMatrixBot) async {
         guard let target = guildOverviewGuildId, !bot.resolvedKey.isEmpty else { return }
         do {
-            let _: OKResponse = try await api.post(
-                "/api/bots/control",
-                body: BotControlRequest(botKey: bot.resolvedKey, guildId: target, action: action, payload: [:])
-            )
+            _ = try await core.control(botKey: bot.resolvedKey, guildId: target, action: action, payload: [:])
             statusMessage = "\(action.capitalized) sent to \(bot.label)."
             Haptics.success()
             await loadGuildOverview()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Control action failed."
+            errorMessage = error.message("Control action failed.")
             Haptics.error()
         }
     }
 
-    // MARK: - Voice <-> stage conversion
-
-    /// Converts every bot's home channel in the selected guild to a stage
-    /// channel (toStage) or back to a voice channel -- same endpoint and
-    /// result reporting as the web Controls page.
     func convertChannels(toStage: Bool) async {
-        guard !guildId.isEmpty else {
-            errorMessage = "Choose a guild before converting channels."
-            return
-        }
-        let label = toStage ? "stage" : "voice"
         isConverting = true
         statusMessage = nil
         errorMessage = nil
         defer { isConverting = false }
         do {
-            let result: ChannelConvertResponse = try await api.post(
-                "/api/guilds/\(guildId)/convert-channels",
-                body: ChannelConvertRequest(direction: label)
-            )
-            let converted = result.converted ?? []
-            let warnings = converted.compactMap(\.warning)
-            let failures = (result.failed ?? []).compactMap(\.error)
-            var message = "Converted \(converted.count) channel(s) to \(label)"
-            if let skipped = result.skippedNoHomeChannel, skipped > 0 {
-                message += " (\(skipped) bot(s) had no home channel set)"
-            }
-            if !warnings.isEmpty { message += " — warnings: " + warnings.joined(separator: "; ") }
-            if !failures.isEmpty { message += " — \(failures.count) failed: " + failures.joined(separator: "; ") }
-            if warnings.isEmpty && failures.isEmpty {
-                statusMessage = message + "."
+            let outcome = try await core.convertChannels(guildId: guildId, toStage: toStage)
+            if outcome.ok {
+                statusMessage = outcome.message
                 Haptics.success()
             } else {
-                errorMessage = message + "."
+                errorMessage = outcome.message
                 Haptics.error()
             }
             await loadControlStateAndQueues()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Channel conversion failed."
+            errorMessage = error.message("Channel conversion failed.")
             Haptics.error()
         }
     }

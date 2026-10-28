@@ -11,7 +11,6 @@ import UserNotifications
 /// this only extends coverage a little further, into the background.
 enum BackgroundRefreshManager {
     static let refreshTaskIdentifier = "com.swarmpanel.ios.refresh"
-    private static let lastNotifiedIdKey = "swarmpanel.lastNotifiedNotificationId"
 
     static func register() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: refreshTaskIdentifier, using: nil) { task in
@@ -35,24 +34,12 @@ enum BackgroundRefreshManager {
         task.expirationHandler = { work.cancel() }
     }
 
+    /// The core returns unread notifications it hasn't surfaced before.
     private static func checkForNewNotifications() async {
-        guard APIClient.shared.token != nil else { return }
-        do {
-            let response: NotificationsResponse = try await APIClient.shared.get("/api/notifications")
-            let unread = (response.notifications ?? []).filter { $0.isUnread }
-            let lastNotifiedId = UserDefaults.standard.integer(forKey: lastNotifiedIdKey)
-            let fresh = unread.filter { $0.id > lastNotifiedId }.sorted { $0.id < $1.id }
-            guard !fresh.isEmpty else { return }
-            // Cap how many banners a single background run can fire — a long
-            // stretch away from the app shouldn't dump a wall of notifications.
-            for notification in fresh.suffix(5) {
-                await deliver(notification)
-            }
-            if let maxId = unread.map(\.id).max() {
-                UserDefaults.standard.set(maxId, forKey: lastNotifiedIdKey)
-            }
-        } catch {
-            // Best-effort — the next scheduled run (or the next foreground poll) reconciles.
+        guard Core.shared.hasToken() else { return }
+        guard let fresh = try? await Core.shared.freshNotifications() else { return }
+        for notification in fresh {
+            await deliver(notification)
         }
     }
 

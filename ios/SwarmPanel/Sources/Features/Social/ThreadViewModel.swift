@@ -9,7 +9,7 @@ final class ThreadViewModel: ObservableObject {
 
     let accountId: Int
     let peerName: String
-    private let api = APIClient.shared
+    private let core = Core.shared
     private let socket = SwarmLiveSocket.shared
     private var pollTask: Task<Void, Never>?
 
@@ -51,12 +51,12 @@ final class ThreadViewModel: ObservableObject {
 
     func load(silent: Bool = false) async {
         do {
-            let response: MessagesResponse = try await api.get("/api/messages/\(accountId)")
+            let response = try await core.messages(accountId: accountId)
             messages = response.messages ?? []
             if !silent { errorMessage = nil }
         } catch {
             guard !error.isCancellation, !silent else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load messages."
+            errorMessage = error.message("Failed to load messages.")
         }
     }
 
@@ -66,12 +66,12 @@ final class ThreadViewModel: ObservableObject {
         isSending = true
         defer { isSending = false }
         do {
-            let _: OKResponse = try await api.post("/api/messages/\(accountId)", body: SendMessageBody(body: text))
+            _ = try await core.sendMessage(accountId: accountId, body: text)
             draft = ""
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to send message."
+            errorMessage = error.message("Failed to send message.")
         }
     }
 }

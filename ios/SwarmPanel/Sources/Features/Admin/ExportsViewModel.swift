@@ -8,19 +8,19 @@ final class ExportsViewModel: ObservableObject {
     @Published var downloadingFileId: String?
     @Published var errorMessage: String?
 
-    private let api = APIClient.shared
+    private let core = Core.shared
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response: ExportsResponse = try await api.get("/api/exports")
+            let response = try await core.exports()
             snapshots = response.snapshots ?? []
             enabled = response.enabled ?? false
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load exports."
+            errorMessage = error.message("Failed to load exports.")
         }
     }
 
@@ -28,13 +28,13 @@ final class ExportsViewModel: ObservableObject {
         downloadingFileId = file.id
         defer { downloadingFileId = nil }
         do {
-            let data = try await api.downloadRaw("/api/exports/\(date)/\(file.name)")
-            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(date)_\(file.name)")
-            try data.write(to: tempURL, options: .atomic)
-            return tempURL
+            let data = try await core.downloadExport(date: date, fileName: file.name)
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(date)_\(file.name)")
+            try data.write(to: url, options: .atomic)
+            return url
         } catch {
             guard !error.isCancellation else { return nil }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to download file."
+            errorMessage = error.message("Failed to download file.")
             return nil
         }
     }

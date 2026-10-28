@@ -7,114 +7,73 @@ final class AccountsAdminViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var errorMessage: String?
     @Published var statusMessage: String?
-
-    // Bulk-selection mode: off by default so the account list behaves
-    // exactly as before until the admin explicitly opts into it (see
-    // AccountsAdminView's "Select" toolbar button).
     @Published var isSelecting = false
     @Published var selectedIds: Set<Int> = []
     @Published var isBulkWorking = false
 
-    private let api = APIClient.shared
+    private let core = Core.shared
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let envelope: SwarmAccountsAdminEnvelope = try await api.get("/api/swarm-accounts/admin", query: ["query": query, "limit": "100"])
-            accounts = envelope.data.users ?? []
+            accounts = try await core.swarmAccounts(query: query).data.users ?? []
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load accounts."
+            errorMessage = error.message("Failed to load accounts.")
         }
     }
 
     func toggleVerified(_ account: SwarmAccountSummary) async {
-        do {
-            let _: OKResponse = try await api.post(
-                "/api/swarm-accounts/email-verified",
-                body: SwarmAccountFlagBody(accountId: account.id, verified: !(account.verificationVerified ?? false))
-            )
-            await load()
-        } catch {
-            guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to update verification."
+        await run("Failed to update verification.") {
+            _ = try await self.core.setAccountVerified(accountId: account.id, verified: !(account.verificationVerified ?? false))
+            await self.load()
         }
     }
 
     func toggleModerator(_ account: SwarmAccountSummary) async {
-        do {
-            let _: OKResponse = try await api.post(
-                "/api/swarm-accounts/moderator",
-                body: SwarmAccountModeratorBody(accountId: account.id, moderator: !account.isModerator)
-            )
-            statusMessage = account.isModerator ? "Moderator access revoked." : "Moderator access granted."
-            await load()
-        } catch {
-            guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to update moderator status."
+        await run("Failed to update moderator status.") {
+            _ = try await self.core.setAccountModerator(accountId: account.id, moderator: !account.isModerator)
+            self.statusMessage = account.isModerator ? "Moderator access revoked." : "Moderator access granted."
+            await self.load()
         }
     }
 
     func resetPassword(_ account: SwarmAccountSummary, newPassword: String) async {
-        do {
-            let _: OKResponse = try await api.post(
-                "/api/swarm-accounts/reset-password",
-                body: SwarmAccountPasswordResetBody(accountId: account.id, newPassword: newPassword)
-            )
-            statusMessage = "Password reset for \(account.username)."
-        } catch {
-            guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to reset password."
+        await run("Failed to reset password.") {
+            _ = try await self.core.resetAccountPassword(accountId: account.id, newPassword: newPassword)
+            self.statusMessage = "Password reset for \(account.username)."
         }
     }
 
     func update(_ account: SwarmAccountSummary, username: String, displayName: String, email: String, guildId: String, serverName: String, publicProfile: Bool) async {
-        do {
-            let _: SwarmAccountUpdateResponse = try await api.post(
-                "/api/swarm-accounts/update",
-                body: SwarmAccountUpdateBody(
-                    accountId: account.id, username: username, displayName: displayName,
-                    email: email, guildId: guildId, serverName: serverName, publicProfile: publicProfile
-                )
-            )
-            statusMessage = "\(username) updated."
-            await load()
-        } catch {
-            guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to update account."
+        await run("Failed to update account.") {
+            _ = try await self.core.updateAccount(accountId: account.id, username: username, displayName: displayName, email: email,
+                                                  guildId: guildId, serverName: serverName, publicProfile: publicProfile)
+            self.statusMessage = "\(username) updated."
+            await self.load()
         }
     }
 
     func delete(_ account: SwarmAccountSummary) async {
-        do {
-            let _: OKResponse = try await api.post("/api/swarm-accounts/delete", body: SwarmAccountDeleteBody(accountId: account.id))
+        await run("Failed to delete account.", failHaptic: true) {
+            _ = try await self.core.deleteAccount(accountId: account.id)
             Haptics.warning()
-            await load()
-        } catch {
-            guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to delete account."
-            Haptics.error()
+            await self.load()
         }
     }
 
     func resendVerification(_ account: SwarmAccountSummary) async {
-        do {
-            let response: SwarmAccountResendVerificationResponse = try await api.post(
-                "/api/swarm-accounts/resend-verification",
-                body: SwarmAccountResendVerificationBody(accountId: account.id)
-            )
+        await run("Failed to resend verification.") {
+            let response = try await self.core.resendAccountVerification(accountId: account.id)
             if response.alreadyVerified == true {
-                statusMessage = "\(account.username) is already verified."
+                self.statusMessage = "\(account.username) is already verified."
             } else if response.verificationSent == true {
-                statusMessage = "Verification code sent to \(account.username)."
+                self.statusMessage = "Verification code sent to \(account.username)."
             } else {
-                errorMessage = "Could not send a verification code to \(account.username)."
+                self.errorMessage = "Could not send a verification code to \(account.username)."
             }
-        } catch {
-            guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to resend verification."
         }
     }
 
@@ -127,29 +86,15 @@ final class AccountsAdminViewModel: ObservableObject {
         selectedIds.removeAll()
     }
 
-    /// Shared summary line for the result toast — "12 succeeded, 1 failed" or
-    /// just "12 succeeded" when nothing failed.
-    private func summarize(_ result: SwarmAccountBulkResult) -> String {
-        let ok = result.succeeded?.count ?? 0
-        let failed = result.failed?.count ?? 0
-        return failed > 0 ? "\(ok) succeeded, \(failed) failed." : "\(ok) succeeded."
-    }
-
     func bulkVerify(_ verified: Bool) async {
         guard !selectedIds.isEmpty else { return }
         isBulkWorking = true
         defer { isBulkWorking = false }
-        do {
-            let result: SwarmAccountBulkResult = try await api.post(
-                "/api/swarm-accounts/bulk-verify",
-                body: SwarmAccountBulkVerifyBody(ids: Array(selectedIds), verified: verified)
-            )
-            statusMessage = "Bulk \(verified ? "verify" : "unverify"): \(summarize(result))"
-            exitSelectionMode()
-            await load()
-        } catch {
-            guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Bulk verify failed."
+        await run("Bulk verify failed.") {
+            let result = try await self.core.bulkVerifyAccounts(ids: Array(self.selectedIds), verified: verified)
+            self.statusMessage = "Bulk \(verified ? "verify" : "unverify"): \(bulkSummary(result: result))"
+            self.exitSelectionMode()
+            await self.load()
         }
     }
 
@@ -157,19 +102,22 @@ final class AccountsAdminViewModel: ObservableObject {
         guard !selectedIds.isEmpty else { return }
         isBulkWorking = true
         defer { isBulkWorking = false }
-        do {
-            let result: SwarmAccountBulkResult = try await api.post(
-                "/api/swarm-accounts/bulk-delete",
-                body: SwarmAccountBulkIdsBody(ids: Array(selectedIds))
-            )
+        await run("Bulk delete failed.", failHaptic: true) {
+            let result = try await self.core.bulkDeleteAccounts(ids: Array(self.selectedIds))
             Haptics.warning()
-            statusMessage = "Bulk delete: \(summarize(result))"
-            exitSelectionMode()
-            await load()
+            self.statusMessage = "Bulk delete: \(bulkSummary(result: result))"
+            self.exitSelectionMode()
+            await self.load()
+        }
+    }
+
+    private func run(_ fallback: String, failHaptic: Bool = false, _ work: () async throws -> Void) async {
+        do {
+            try await work()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Bulk delete failed."
-            Haptics.error()
+            errorMessage = error.message(fallback)
+            if failHaptic { Haptics.error() }
         }
     }
 }

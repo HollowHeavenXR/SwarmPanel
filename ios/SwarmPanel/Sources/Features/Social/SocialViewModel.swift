@@ -11,7 +11,7 @@ final class SocialViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isLoading = false
 
-    private let api = APIClient.shared
+    private let core = Core.shared
     private let socket = SwarmLiveSocket.shared
     private var watching = false
 
@@ -53,72 +53,72 @@ final class SocialViewModel: ObservableObject {
 
     func search() async {
         do {
-            let response: UserSearchResponse = try await api.get("/api/users/directory", query: ["q": searchQuery])
+            let response = try await core.searchUsers(query: searchQuery)
             searchResults = response.users ?? []
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Search failed."
+            errorMessage = error.message("Search failed.")
         }
     }
 
     func loadFriendRequests() async {
         do {
-            let response: FriendRequestsResponse = try await api.get("/api/friends/requests")
+            let response = try await core.friendRequests()
             incomingRequests = response.incoming ?? []
             outgoingRequests = response.outgoing ?? []
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load friend requests."
+            errorMessage = error.message("Failed to load friend requests.")
         }
     }
 
     func loadFriends() async {
         do {
-            let response: FriendsResponse = try await api.get("/api/me/friends")
+            let response = try await core.friends()
             friends = response.friends ?? []
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load friends."
+            errorMessage = error.message("Failed to load friends.")
         }
     }
 
     func loadThreads() async {
         do {
-            let response: MessageThreadsResponse = try await api.get("/api/messages/threads")
+            let response = try await core.messageThreads()
             threads = response.threads ?? []
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load messages."
+            errorMessage = error.message("Failed to load messages.")
         }
     }
 
     func follow(_ accountId: Int, following: Bool = true) async {
         do {
-            let _: OKResponse = try await api.post("/api/users/\(accountId)/follow", body: FollowBody(following: following))
+            _ = try await core.follow(accountId: accountId, following: following)
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Follow failed."
+            errorMessage = error.message("Follow failed.")
         }
     }
 
     func sendFriendRequest(_ accountId: Int) async {
         do {
-            let _: OKResponse = try await api.post("/api/users/\(accountId)/friend-request")
+            _ = try await core.sendFriendRequest(accountId: accountId)
             await loadFriendRequests()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Friend request failed."
+            errorMessage = error.message("Friend request failed.")
         }
     }
 
     func respondToRequest(_ request: FriendRequest, action: String) async {
         do {
-            let _: OKResponse = try await api.post("/api/friends/requests/\(request.id)", body: FriendActionBody(action: action))
+            _ = try await core.respondFriendRequest(requestId: request.id, action: action)
             await loadFriendRequests()
             await loadFriends()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Action failed."
+            errorMessage = error.message("Action failed.")
         }
     }
 }

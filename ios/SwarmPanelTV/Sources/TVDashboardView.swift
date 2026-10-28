@@ -157,7 +157,7 @@ struct TVDashboardView: View {
             HStack(spacing: 24) {
                 TVReadout(value: "\(model.backupDepth)", label: "Backup")
                 TVReadout(value: "\(model.guildsServed)", label: "Guilds")
-                TVReadout(value: model.audioNodesHealthy ? "Healthy" : "Checking", label: "Audio nodes",
+                TVReadout(value: model.audioNodesHealthy ? "Healthy" : "Checking", label: "Voice links",
                           tint: model.audioNodesHealthy ? TVRes.live : TVRes.warn)
             }
         }

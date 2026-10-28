@@ -7,18 +7,17 @@ final class AlertRulesViewModel: ObservableObject {
     @Published var isSaving = false
     @Published var errorMessage: String?
 
-    private let api = APIClient.shared
+    private let core = Core.shared
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response: AlertRulesResponse = try await api.get("/api/alert-rules")
-            rules = response.rules ?? []
+            rules = try await core.alertRules().rules ?? []
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load alert rules."
+            errorMessage = error.message("Failed to load alert rules.")
         }
     }
 
@@ -26,40 +25,32 @@ final class AlertRulesViewModel: ObservableObject {
         isSaving = true
         defer { isSaving = false }
         do {
-            let _: AlertRuleEnvelope = try await api.post(
-                "/api/alert-rules",
-                body: AlertRuleCreateBody(
-                    ruleType: ruleType, thresholdMinutes: thresholdMinutes, enabled: true,
-                    escalationMinutes: escalationMinutes, escalateEmail: escalationMinutes != nil ? escalateEmail : nil
-                )
-            )
+            _ = try await core.createAlertRule(ruleType: ruleType, thresholdMinutes: thresholdMinutes, enabled: true,
+                                               escalationMinutes: escalationMinutes, escalateEmail: escalationMinutes != nil ? escalateEmail : nil)
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to create alert rule."
+            errorMessage = error.message("Failed to create alert rule.")
         }
     }
 
     func toggle(_ rule: AlertRule) async {
         do {
-            let _: AlertRuleEnvelope = try await api.post(
-                "/api/alert-rules/\(rule.id)/update",
-                body: AlertRuleToggleBody(enabled: !rule.enabled)
-            )
+            _ = try await core.setAlertRuleEnabled(ruleId: rule.id, enabled: !rule.enabled)
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to update alert rule."
+            errorMessage = error.message("Failed to update alert rule.")
         }
     }
 
     func delete(_ rule: AlertRule) async {
         do {
-            let _: OKResponse = try await api.post("/api/alert-rules/\(rule.id)/delete")
+            _ = try await core.deleteAlertRule(ruleId: rule.id)
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to delete alert rule."
+            errorMessage = error.message("Failed to delete alert rule.")
         }
     }
 }

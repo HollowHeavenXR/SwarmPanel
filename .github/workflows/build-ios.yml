@@ -5,6 +5,7 @@ on:
     branches: [ main ]
     paths:
       - 'ios/**'
+      - 'rust/core/**'
       - '.github/workflows/build-ios.yml'
   workflow_dispatch:
     inputs:
@@ -37,6 +38,21 @@ jobs:
 
       - name: Install XcodeGen
         run: brew install xcodegen
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: rust-core-${{ runner.os }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: rust-core-${{ runner.os }}-
+
+      - name: Build Rust core
+        env:
+          PLATFORMS: "ios"
+        run: ios/scripts/build-core.sh
 
       - name: Generate Xcode project
         working-directory: ios

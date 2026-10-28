@@ -25,38 +25,32 @@ final class WidgetDataService {
         FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetShared.appGroupID) != nil
     }
 
-    func update(bots: [DashboardBot], ownSession: DashboardSession?) {
+    /// Publishes the widget/Live Activity state. What to show is computed
+    /// by the core (widgetSnapshot); this writes it where WidgetKit reads it.
+    func update(dashboard: DashboardResponse, guildId: String?) {
         guard let ud = defaults else { return }
-
-        let sessions = bots.flatMap { $0.sessions ?? [] }
-        ud.set(bots.count, forKey: WidgetShared.Keys.botsCount)
-        ud.set(sessions.filter { $0.isPlaying == true }.count, forKey: WidgetShared.Keys.liveCount)
-        ud.set(sessions.reduce(0) { $0 + ($1.queueCount ?? 0) }, forKey: WidgetShared.Keys.queuedCount)
-
-        let title = ownSession?.title ?? ""
-        let subtitle = ownSession?.channelName ?? ownSession?.guildName ?? ""
-        let isPlaying = ownSession?.isPlaying ?? false
-        let isPaused = ownSession?.isPaused ?? false
-        let position = Double(ownSession?.positionSeconds ?? 0)
-        let duration = Double(ownSession?.durationSeconds ?? 0)
-        ud.set(title, forKey: WidgetShared.Keys.title)
-        ud.set(subtitle, forKey: WidgetShared.Keys.subtitle)
-        ud.set(isPlaying, forKey: WidgetShared.Keys.isPlaying)
-        ud.set(isPaused, forKey: WidgetShared.Keys.isPaused)
-        ud.set(position, forKey: WidgetShared.Keys.position)
-        ud.set(duration, forKey: WidgetShared.Keys.duration)
+        let w = widgetSnapshot(dashboard: dashboard, guildId: guildId)
+        ud.set(w.botsCount, forKey: WidgetShared.Keys.botsCount)
+        ud.set(w.liveCount, forKey: WidgetShared.Keys.liveCount)
+        ud.set(w.queuedCount, forKey: WidgetShared.Keys.queuedCount)
+        ud.set(w.title, forKey: WidgetShared.Keys.title)
+        ud.set(w.subtitle, forKey: WidgetShared.Keys.subtitle)
+        ud.set(w.isPlaying, forKey: WidgetShared.Keys.isPlaying)
+        ud.set(w.isPaused, forKey: WidgetShared.Keys.isPaused)
+        ud.set(w.position, forKey: WidgetShared.Keys.position)
+        ud.set(w.duration, forKey: WidgetShared.Keys.duration)
         ud.set(Date().timeIntervalSinceReferenceDate, forKey: WidgetShared.Keys.anchorDate)
 
         reloadTimelinesThrottled()
 
         if #available(iOS 16.1, *) {
             LiveActivityManager.update(
-                title: title, subtitle: subtitle, isPlaying: isPlaying, isPaused: isPaused,
-                position: position, duration: duration
+                title: w.title, subtitle: w.subtitle, isPlaying: w.isPlaying, isPaused: w.isPaused,
+                position: w.position, duration: w.duration
             )
         }
 
-        Task { await downloadThumbnailIfNeeded(ownSession?.thumbnail) }
+        Task { await downloadThumbnailIfNeeded(w.thumbnail) }
     }
 
     private func downloadThumbnailIfNeeded(_ urlString: String?) async {

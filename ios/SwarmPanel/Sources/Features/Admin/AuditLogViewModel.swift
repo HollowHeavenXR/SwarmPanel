@@ -10,41 +10,33 @@ final class AuditLogViewModel: ObservableObject {
     @Published var statusMessage: String?
     @Published var revertingId: Int?
 
-    private let api = APIClient.shared
+    private let core = Core.shared
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let envelope: AuditLogEnvelope = try await api.get(
-                "/api/audit-log",
-                query: ["limit": "100", "action": actionFilter.isEmpty ? nil : actionFilter]
-            )
-            entries = envelope.data.entries ?? []
-            total = envelope.data.total ?? entries.count
+            let data = try await core.auditLog(limit: 100, action: actionFilter).data
+            entries = data.entries ?? []
+            total = data.total ?? entries.count
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load audit log."
+            errorMessage = error.message("Failed to load audit log.")
         }
     }
 
-    /// Not every entry is revertible — routes.lua's REVERTIBLE_ACTIONS table
-    /// gates this server-side (and requires a recorded before-state on the
-    /// entry), so the client doesn't try to precompute eligibility and just
-    /// surfaces whatever 400 message comes back for an entry that can't be
-    /// reverted.
     func revert(_ entry: AuditLogEntry) async {
         revertingId = entry.id
         defer { revertingId = nil }
         do {
-            let _: OKResponse = try await api.post("/api/audit-log/\(entry.id)/revert")
+            _ = try await core.revertAuditEntry(entryId: entry.id)
             Haptics.success()
             statusMessage = "Reverted \(entry.action)."
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to revert this entry."
+            errorMessage = error.message("Failed to revert this entry.")
             Haptics.error()
         }
     }

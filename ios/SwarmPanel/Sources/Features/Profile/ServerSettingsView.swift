@@ -7,7 +7,7 @@ import SwiftUI
 struct ServerSettingsView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
-    @State private var urlText = APIClient.shared.baseURL.absoluteString
+    @State private var urlText = Core.shared.baseUrl()
     @State private var errorMessage: String?
 
     var body: some View {
@@ -34,7 +34,7 @@ struct ServerSettingsView: View {
 
             Section {
                 Button("Reset to Default") {
-                    urlText = APIClient.defaultBaseURL.absoluteString
+                    urlText = Core.shared.defaultBaseUrl()
                 }
             }
             .listRowBackground(ResRowBackground())
@@ -65,7 +65,7 @@ struct ServerSettingsView: View {
             errorMessage = "Enter a valid http:// or https:// URL."
             return
         }
-        APIClient.shared.baseURL = url
+        Core.shared.setBaseUrl(url: url.absoluteString)
         appState.logout()
         dismiss()
     }

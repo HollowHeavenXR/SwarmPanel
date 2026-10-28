@@ -118,7 +118,7 @@ struct AdminHubView: View {
 
     private func loadStats() async {
         // Silent on failure: the tool list below still works without stats.
-        stats = try? await APIClient.shared.get("/api/admin/overview")
+        stats = try? await Core.shared.adminOverview()
     }
 }
 

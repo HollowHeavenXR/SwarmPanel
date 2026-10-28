@@ -8,7 +8,7 @@ final class PublicProfileViewModel: ObservableObject {
     @Published var isActing = false
     @Published var errorMessage: String?
 
-    private let api = APIClient.shared
+    private let core = Core.shared
     let accountId: Int
 
     init(accountId: Int) {
@@ -19,12 +19,12 @@ final class PublicProfileViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            let envelope: PublicProfileEnvelope = try await api.get("/api/users/\(accountId)/profile")
+            let envelope = try await core.publicProfile(accountId: accountId)
             profile = envelope.profile
             permissions = envelope.socialPermissions
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load profile."
+            errorMessage = error.message("Failed to load profile.")
         }
     }
 
@@ -33,15 +33,12 @@ final class PublicProfileViewModel: ObservableObject {
         isActing = true
         defer { isActing = false }
         do {
-            let _: OKResponse = try await api.post(
-                "/api/users/\(accountId)/follow",
-                body: FollowBody(following: !(profile.followedByMe ?? false))
-            )
+            _ = try await core.follow(accountId: accountId, following: !(profile.followedByMe ?? false))
             Haptics.success()
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to update follow."
+            errorMessage = error.message("Failed to update follow.")
             Haptics.error()
         }
     }
@@ -50,12 +47,12 @@ final class PublicProfileViewModel: ObservableObject {
         isActing = true
         defer { isActing = false }
         do {
-            let _: OKResponse = try await api.post("/api/users/\(accountId)/friend-request")
+            _ = try await core.sendFriendRequest(accountId: accountId)
             Haptics.success()
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to send friend request."
+            errorMessage = error.message("Failed to send friend request.")
             Haptics.error()
         }
     }

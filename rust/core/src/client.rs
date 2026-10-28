@@ -468,6 +468,25 @@ impl SwarmCore {
             Ok(ActionOutcome { ok: true, message: format!("Queued {} track(s) from \"{}\".", items.len(), queue.name) })
         })
     }
+    /// RECOVER every session stuck in "recovering"; summary like "Recovered 2/3 session(s).".
+    pub async fn recover_all_stale(&self) -> Result<ActionOutcome, ApiError> {
+        call!(self, |i| {
+            let d: DashboardResponse = i.get("/api/dashboard", &[]).await?;
+            let targets = crate::helpers::find_recoverable_sessions(d);
+            let mut ok = 0;
+            for t in &targets {
+                let g = t.session.guild_id.clone().unwrap_or_default();
+                if i.post::<OkResponse>("/api/bots/control", json!({ "bot_key": t.bot.key, "guild_id": g, "action": "RECOVER", "payload": {} })).await.is_ok() {
+                    ok += 1;
+                }
+            }
+            Ok(ActionOutcome { ok: ok == targets.len(), message: format!("Recovered {ok}/{} session(s).", targets.len()) })
+        })
+    }
+    /// RESTART a whole bot process (owner only).
+    pub async fn restart_bot(&self, bot_key: String) -> Result<OkResponse, ApiError> {
+        call!(self, |i| i.post("/api/bots/control", json!({ "bot_key": bot_key, "guild_id": "0", "action": "RESTART", "payload": {} })).await)
+    }
     pub async fn control_matrix(&self, guild_id: String) -> Result<ControlMatrixResponse, ApiError> {
         call!(self, |i| i.get(&format!("/api/guilds/{}/control-matrix", urlencoding::encode(&guild_id)), &[]).await)
     }
@@ -515,7 +534,7 @@ impl SwarmCore {
     pub async fn preferences(&self) -> Result<PanelPreferencesEnvelope, ApiError> {
         call!(self, |i| i.get("/api/users/preferences", &[]).await)
     }
-    pub async fn change_password(&self, current_password: String, new_password: String) -> Result<OkResponse, ApiError> {
+    pub async fn change_password(&self, current_password: String, new_password: String) -> Result<MeProfileEnvelope, ApiError> {
         call!(self, |i| {
             if new_password.chars().count() < 8 {
                 return Err(ApiError::invalid("The new password must be at least 8 characters."));
@@ -650,8 +669,8 @@ impl SwarmCore {
     pub async fn delete_alert_rule(&self, rule_id: SwiftInt) -> Result<OkResponse, ApiError> {
         call!(self, |i| i.post(&format!("/api/alert-rules/{}/delete", rule_id.0), json!({})).await)
     }
-    pub async fn audit_log(&self, limit: SwiftInt) -> Result<AuditLogEnvelope, ApiError> {
-        call!(self, |i| i.get("/api/audit-log", &[("limit", Some(limit.0.to_string()))]).await)
+    pub async fn audit_log(&self, limit: SwiftInt, action: Option<String>) -> Result<AuditLogEnvelope, ApiError> {
+        call!(self, |i| i.get("/api/audit-log", &[("limit", Some(limit.0.to_string())), ("action", action.filter(|a| !a.trim().is_empty()))]).await)
     }
     pub async fn revert_audit_entry(&self, entry_id: SwiftInt) -> Result<OkResponse, ApiError> {
         call!(self, |i| i.post(&format!("/api/audit-log/{}/revert", entry_id.0), json!({})).await)

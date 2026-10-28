@@ -22,16 +22,15 @@ final class LeaderboardViewModel: ObservableObject {
     @Published var swarmWindowDays: Int = 7
     @Published var swarmData: SwarmLeaderboardResponse?
 
-    private let api = APIClient.shared
+    private let core = Core.shared
 
     func loadBots() async {
         do {
-            let response: BotsResponse = try await api.get("/api/bots")
-            bots = (response.bots ?? []).filter { $0.kind == "music" }
+            bots = (try await core.bots().bots ?? []).filter { $0.kind == "music" }
             if selectedBotKey.isEmpty { selectedBotKey = bots.first?.id ?? "" }
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load bots."
+            errorMessage = error.message("Failed to load bots.")
         }
     }
 
@@ -40,15 +39,11 @@ final class LeaderboardViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            let envelope: LeaderboardEnvelope = try await api.get(
-                "/api/guilds/\(guildId)/leaderboard",
-                query: ["bot_key": selectedBotKey]
-            )
-            data = envelope.data
+            data = try await core.guildLeaderboard(guildId: guildId, botKey: selectedBotKey).data
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load leaderboard."
+            errorMessage = error.message("Failed to load leaderboard.")
         }
     }
 
@@ -61,15 +56,11 @@ final class LeaderboardViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response: SwarmLeaderboardResponse = try await api.get(
-                "/api/swarm-leaderboard",
-                query: ["days": String(swarmWindowDays), "limit": "25"]
-            )
-            swarmData = response
+            swarmData = try await core.swarmLeaderboard(days: swarmWindowDays, limit: 25)
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load swarm leaderboard."
+            errorMessage = error.message("Failed to load swarm leaderboard.")
         }
     }
 }

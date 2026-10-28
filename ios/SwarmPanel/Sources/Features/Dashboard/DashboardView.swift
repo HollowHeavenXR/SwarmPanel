@@ -120,11 +120,8 @@ struct DashboardView: View {
         // so the backing property isn't guaranteed updated yet at the point
         // this closure runs.
         .onReceive(viewModel.$response) { newResponse in
-            let bots = newResponse?.bots ?? []
-            let ownSession = appState.guildId.flatMap { guildId in
-                bots.flatMap { $0.sessions ?? [] }.first { $0.guildId == guildId }
-            }
-            WidgetDataService.shared.update(bots: bots, ownSession: ownSession)
+            guard let newResponse else { return }
+            WidgetDataService.shared.update(dashboard: newResponse, guildId: appState.guildId)
         }
     }
 
@@ -369,10 +366,7 @@ struct DashboardView: View {
     private func sendQuickAction(_ action: String, bot: DashboardBot, session: DashboardSession) async {
         guard let guildId = session.guildId else { return }
         do {
-            let _: OKResponse = try await APIClient.shared.post(
-                "/api/bots/control",
-                body: BotControlRequest(botKey: bot.key, guildId: guildId, action: action, payload: [:])
-            )
+            _ = try await Core.shared.control(botKey: bot.key, guildId: guildId, action: action, payload: [:])
             Haptics.success()
             toastCenter.success("Sent \(action.capitalized)")
             await viewModel.refresh()
@@ -597,7 +591,7 @@ private struct NowPlayingQuickControl: View {
             onPause: isCurrentlyPlaying ? { Task { await send("PAUSE") } } : nil,
             onResume: !isCurrentlyPlaying ? { Task { await send("RESUME") } } : nil,
             onSkip: { Task { await send("SKIP") } },
-            onSeek: { seconds in Task { await send("SEEK", payload: ["position_seconds": "\(seconds)"]) } }
+            onSeek: { seconds in Task { await seek(Int(seconds)) } }
         )
     }
 
@@ -607,13 +601,22 @@ private struct NowPlayingQuickControl: View {
         Haptics.light()
         defer { isBusy = false }
         do {
-            let _: OKResponse = try await APIClient.shared.post(
-                "/api/bots/control",
-                body: BotControlRequest(botKey: botKey, guildId: guildId, action: action, payload: payload)
-            )
+            _ = try await Core.shared.control(botKey: botKey, guildId: guildId, action: action, payload: payload)
         } catch {
             // Best-effort — the Controls screen surfaces errors properly;
             // a failed quick-action here just leaves the button re-enabled.
+            if !error.isCancellation { Haptics.error() }
+        }
+    }
+
+    private func seek(_ seconds: Int) async {
+        guard let guildId = session.guildId else { return }
+        isBusy = true
+        Haptics.light()
+        defer { isBusy = false }
+        do {
+            _ = try await Core.shared.seek(botKey: botKey, guildId: guildId, positionSeconds: seconds)
+        } catch {
             if !error.isCancellation { Haptics.error() }
         }
     }

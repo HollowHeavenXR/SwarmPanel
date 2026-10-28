@@ -19,7 +19,7 @@ final class NotificationsViewModel: ObservableObject {
     @Published var pendingFriendRequests = 0
     var communityBadge: Int { unreadMessages + pendingFriendRequests }
 
-    private let api = APIClient.shared
+    private let core = Core.shared
     private let socket = SwarmLiveSocket.shared
     private var pollTask: Task<Void, Never>?
     private var watching = false
@@ -66,7 +66,7 @@ final class NotificationsViewModel: ObservableObject {
 
     func refreshCommunityCounts() async {
         do {
-            let counts: CommunityCounts = try await api.get("/api/community/counts")
+            let counts = try await core.communityCounts()
             applyCommunityCounts(counts)
         } catch {
             // Silent, like the unread-count poll above -- a badge is non-critical.
@@ -80,7 +80,7 @@ final class NotificationsViewModel: ObservableObject {
 
     func refreshUnreadCount() async {
         do {
-            let response: UnreadCountResponse = try await api.get("/api/notifications/unread-count")
+            let response = try await core.unreadCount()
             unreadCount = response.unreadCount ?? 0
         } catch {
             // Silent — notifications are non-critical, don't surface a toast for a failed poll.
@@ -91,19 +91,19 @@ final class NotificationsViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response: NotificationsResponse = try await api.get("/api/notifications")
+            let response = try await core.notifications()
             notifications = response.notifications ?? []
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load notifications."
+            errorMessage = error.message("Failed to load notifications.")
         }
     }
 
     func markRead(_ notification: PanelNotification) async {
         guard notification.isUnread else { return }
         do {
-            let _: OKResponse = try await api.post("/api/notifications/\(notification.id)/read")
+            _ = try await core.markNotificationRead(notificationId: notification.id)
             unreadCount = max(0, unreadCount - 1)
             if let index = notifications.firstIndex(where: { $0.id == notification.id }) {
                 notifications[index] = PanelNotification(
@@ -119,12 +119,12 @@ final class NotificationsViewModel: ObservableObject {
 
     func markAllRead() async {
         do {
-            let _: OKResponse = try await api.post("/api/notifications/read-all")
+            _ = try await core.markAllNotificationsRead()
             unreadCount = 0
             await loadNotifications()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to mark all read."
+            errorMessage = error.message("Failed to mark all read.")
         }
     }
 

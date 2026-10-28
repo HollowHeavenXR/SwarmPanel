@@ -5,62 +5,28 @@ import SwiftUI
 /// REST fallback (GET /api/users/me + /api/users/preferences) at start and
 /// whenever the socket is down. Changing the background, accent or profile
 /// on the web shows up on the TV within ~10 seconds.
-struct TVAccountSnapshot: Codable {
-    let profile: TVProfile?
-    let preferences: TVPreferences?
-}
-
-struct TVProfile: Codable {
-    let username: String?
-    let displayName: String?
-    let avatarUrl: String?
-    let serverName: String?
-    let serverIconUrl: String?
-    let profileHeadline: String?
-    let guildId: String?
-
-    var name: String {
-        if let displayName, !displayName.isEmpty { return displayName }
-        return username ?? "Operator"
-    }
-}
-
-struct TVPreferences: Codable {
-    let accentColor: String?
-    let backgroundMode: String?
-    let backgroundColor: String?
-    let backgroundImageUrl: String?
-    let accentContrastText: String?
-}
-
-private struct TVMeEnvelope: Decodable { let profile: TVProfile? }
-private struct TVPreferencesEnvelope: Decodable { let preferences: TVPreferences? }
-
 @MainActor
 final class TVAccountModel: ObservableObject {
     @Published private(set) var profile: TVProfile?
     @Published private(set) var preferences: TVPreferences?
 
     private let socket = SwarmLiveSocket.shared
-    private let api = APIClient.shared
+    private let core = Core.shared
     private let telemetry = TVTelemetry.shared
     private var pollTask: Task<Void, Never>?
 
-    private static let cacheKey = "swarmpanel.tv.accountSnapshot"
 
     /// The last known profile + appearance from disk, so the TV comes up in
     /// the account's own background straight away instead of flashing the
     /// default one until the network answers.
     init() {
-        guard let data = UserDefaults.standard.data(forKey: Self.cacheKey),
-              let cached = try? JSONDecoder().decode(TVAccountSnapshot.self, from: data) else { return }
+        guard let cached = core.cachedAccount() else { return }
         profile = cached.profile
         preferences = cached.preferences
     }
 
-    static func clearCache() {
-        UserDefaults.standard.removeObject(forKey: cacheKey)
-    }
+    /// The core clears its caches on sign-out; kept for call-site compatibility.
+    static func clearCache() {}
 
     func start() {
         guard pollTask == nil else { return }
@@ -92,10 +58,11 @@ final class TVAccountModel: ObservableObject {
         var newProfile: TVProfile?
         var newPreferences: TVPreferences?
         do {
-            let me: TVMeEnvelope = try await api.get("/api/users/me")
-            newProfile = me.profile
-            let prefs: TVPreferencesEnvelope = try await api.get("/api/users/preferences")
-            newPreferences = prefs.preferences
+            let me = try await core.me().profile
+            newProfile = AccountProfile(username: me.username, displayName: me.displayName, avatarUrl: me.avatarUrl, serverName: me.serverName,
+                                        serverIconUrl: me.serverIconUrl, profileHeadline: me.profileHeadline, guildId: me.guildId,
+                                        favoriteBot: nil, themeAccent: me.themeAccent, role: nil, adminMode: nil)
+            newPreferences = try await core.preferences().preferences
         } catch {
             if !error.isCancellation {
                 telemetry.log("account_load_failure", ["kind": TVTelemetry.kind(of: error)])
@@ -123,9 +90,7 @@ final class TVAccountModel: ObservableObject {
         }
         guard !changed.isEmpty else { return }
         telemetry.log("account_sync", ["source": source, "changed": changed.joined(separator: ",")])
-        if let data = try? JSONEncoder().encode(TVAccountSnapshot(profile: profile, preferences: preferences)) {
-            UserDefaults.standard.set(data, forKey: Self.cacheKey)
-        }
+        core.saveAccountCache(snapshot: AccountSnapshot(profile: profile, preferences: preferences))
     }
 
     // MARK: - Appearance (mirrors html.lua's panel_style())

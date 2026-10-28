@@ -41,10 +41,11 @@ targets:
       # needing a separate framework target.
       - path: Shared/WidgetShared.swift
       - path: Shared/SwarmPanelControlIntents.swift
-      # Client telemetry, shared with the Apple TV app. The iOS target had
-      # none before, which is why "ios" never showed up in the server-side
-      # client telemetry at all.
-      - path: Shared/ClientTelemetry.swift
+      # Rust app core: generated Swift API + the Swift bridge (storage,
+      # live-socket wrapper, model conveniences). Built by
+      # scripts/build-core.sh into RustCore/ before XcodeGen runs.
+      - path: RustCore/SwarmPanelCore.swift
+      - path: Shared/Core
       # Resonance (the visual language) pieces shared with the Apple TV app:
       # bot colours, hive geometry, the wave field and the equalizer.
       - path: Shared/Resonance.swift
@@ -63,6 +64,10 @@ targets:
         DEVELOPMENT_TEAM: ""
     dependencies:
       - target: SwarmPanelWidget
+      - framework: RustCore/SwarmPanelCore.xcframework
+        embed: false
+      - sdk: Security.framework
+      - sdk: SystemConfiguration.framework
     scheme:
       buildAction:
         targets:
@@ -97,9 +102,16 @@ targets:
       - path: SwarmPanelWidget/Sources
       - path: Shared/WidgetShared.swift
       - path: Shared/SwarmPanelControlIntents.swift
-      - path: SwarmPanel/Sources/Networking
-      - path: SwarmPanel/Sources/Models/BotModels.swift
-      - path: SwarmPanel/Sources/Models/Common.swift
+      # Rust app core: generated Swift API + the Swift bridge (storage,
+      # live-socket wrapper, model conveniences). Built by
+      # scripts/build-core.sh into RustCore/ before XcodeGen runs.
+      - path: RustCore/SwarmPanelCore.swift
+      - path: Shared/Core
+    dependencies:
+      - framework: RustCore/SwarmPanelCore.xcframework
+        embed: false
+      - sdk: Security.framework
+      - sdk: SystemConfiguration.framework
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.swarmpanel.ios.widget
@@ -111,26 +123,19 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks"
 
   # Apple TV app: the Dashboard only, read-only, never in admin mode (see
-  # SwarmPanelTV/Sources/SwarmPanelTVApp.swift). Reuses the iOS app's
-  # networking, live socket and session/dashboard models directly -- the
-  # same way SwarmPanelWidget does -- rather than a separate framework.
-  # FleetControlService is left out: it sends bot orders and depends on
-  # the widget's shared file.
+  # SwarmPanelTV/Sources/SwarmPanelTVApp.swift). Uses the same Rust core as
+  # the iOS app and widget.
   SwarmPanelTV:
     type: application
     platform: tvOS
     sources:
       - path: SwarmPanelTV/Sources
-      - path: Shared/ClientTelemetry.swift
       - path: Shared/Resonance.swift
-      - path: SwarmPanel/Sources/Networking/APIClient.swift
-      - path: SwarmPanel/Sources/Networking/APIError.swift
-      - path: SwarmPanel/Sources/Networking/CancellationCheck.swift
-      - path: SwarmPanel/Sources/Networking/KeychainStore.swift
-      - path: SwarmPanel/Sources/Networking/SwarmLiveSocket.swift
-      - path: SwarmPanel/Sources/Models/BotModels.swift
-      - path: SwarmPanel/Sources/Models/Common.swift
-      - path: SwarmPanel/Sources/Models/SessionModels.swift
+      # Rust app core: generated Swift API + the Swift bridge (storage,
+      # live-socket wrapper, model conveniences). Built by
+      # scripts/build-core.sh into RustCore/ before XcodeGen runs.
+      - path: RustCore/SwarmPanelCore.swift
+      - path: Shared/Core
     # Listed explicitly (like the iOS target) so XcodeGen creates a real
     # "Compile Asset Catalogs" phase: that's what produces Assets.car and
     # writes the app icon (CFBundleIcons) and Top Shelf (TVTopShelfImage)
@@ -150,6 +155,11 @@ targets:
         TARGETED_DEVICE_FAMILY: "3"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
+    dependencies:
+      - framework: RustCore/SwarmPanelCore.xcframework
+        embed: false
+      - sdk: Security.framework
+      - sdk: SystemConfiguration.framework
     scheme:
       buildAction:
         targets:

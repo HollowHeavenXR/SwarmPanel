@@ -112,7 +112,7 @@ struct DatabasesView: View {
                                 HStack(alignment: .top) {
                                     Text(key).font(.caption.bold()).foregroundStyle(SwarmTheme.textMuted)
                                     Spacer()
-                                    Text(row[key]?.displayString ?? "—")
+                                    Text(row[key] ?? "—")
                                         .font(isIdLikeColumn(key) ? .caption.monospaced() : .caption)
                                         .foregroundStyle(isIdLikeColumn(key) ? SwarmTheme.accent : SwarmTheme.textPrimary)
                                         .multilineTextAlignment(.trailing)

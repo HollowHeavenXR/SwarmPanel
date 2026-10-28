@@ -13,30 +13,25 @@ final class TVDashboardModel: ObservableObject {
     @Published private(set) var isFromCache = false
 
     private let socket = SwarmLiveSocket.shared
-    private let api = APIClient.shared
+    private let core = Core.shared
     private let telemetry = TVTelemetry.shared
     private var pollTask: Task<Void, Never>?
     private var startedAt = Date()
     private var reportedFirstLive = false
     private var fallbackPolls = 0
 
-    private static let cacheKey = "swarmpanel.tv.dashboardSnapshot"
-    private static let cacheTimestampKey = "swarmpanel.tv.dashboardSnapshotAt"
 
     /// Loads the last snapshot from disk so the dashboard appears instantly
     /// on launch, before the network has answered.
     init() {
-        guard let data = UserDefaults.standard.data(forKey: Self.cacheKey),
-              let cached = try? JSONDecoder().decode(TVDashboardResponse.self, from: data) else { return }
-        dashboard = cached
-        lastUpdated = UserDefaults.standard.object(forKey: Self.cacheTimestampKey) as? Date
+        guard let cached = core.cachedDashboard() else { return }
+        dashboard = cached.dashboard
+        lastUpdated = Date(timeIntervalSince1970: cached.savedAt)
         isFromCache = true
     }
 
-    static func clearCache() {
-        UserDefaults.standard.removeObject(forKey: cacheKey)
-        UserDefaults.standard.removeObject(forKey: cacheTimestampKey)
-    }
+    /// The core clears its caches on sign-out; kept for call-site compatibility.
+    static func clearCache() {}
 
     func start() {
         guard pollTask == nil else { return }
@@ -53,7 +48,7 @@ final class TVDashboardModel: ObservableObject {
                 self.apply(snapshot, source: "live")
             case .failure(let error):
                 self.telemetry.log("dashboard_live_error", ["kind": TVTelemetry.kind(of: error)])
-                if self.dashboard == nil { self.errorMessage = error.localizedDescription }
+                if self.dashboard == nil { self.errorMessage = error.message("Live updates failed.") }
             }
         }
         socket.connect()
@@ -85,14 +80,14 @@ final class TVDashboardModel: ObservableObject {
     private func loadOnce(source: String) async {
         let started = Date()
         do {
-            let fresh: TVDashboardResponse = try await api.get("/api/dashboard")
+            let fresh = try await core.dashboard()
             apply(fresh, source: source, requestMs: TVTelemetry.ms(since: started))
         } catch {
             guard !error.isCancellation else { return }
             telemetry.log("dashboard_load_failure", value: TVTelemetry.ms(since: started),
                           ["source": source, "kind": TVTelemetry.kind(of: error)])
             if dashboard == nil {
-                errorMessage = (error as? LocalizedError)?.errorDescription ?? "Couldn't load the dashboard."
+                errorMessage = error.message("Couldn't load the dashboard.")
             }
         }
     }
@@ -118,29 +113,19 @@ final class TVDashboardModel: ObservableObject {
         // Persist at most every 30s: the live push arrives every couple of
         // seconds and the snapshot only needs to be roughly current for the
         // next launch.
-        let lastSaved = UserDefaults.standard.object(forKey: Self.cacheTimestampKey) as? Date
-        // tvOS caps an app's UserDefaults at ~500 KB (shared with the
-        // telemetry queue and account snapshot), so an unusually large
-        // snapshot is skipped rather than risking the whole store.
-        if lastSaved.map({ now.timeIntervalSince($0) > 30 }) ?? true,
-           let data = try? JSONEncoder().encode(snapshot), data.count < 250_000 {
-            UserDefaults.standard.set(data, forKey: Self.cacheKey)
-            UserDefaults.standard.set(now, forKey: Self.cacheTimestampKey)
-        }
+        core.saveDashboardCache(dashboard: snapshot)
     }
 
     // MARK: - Fleet summary (same totals as the web dashboard's metric strip)
 
     var musicBots: [TVBot] { (dashboard?.bots ?? []).filter { !$0.isOrchestrator } }
     var orchestrator: TVBot? { dashboard?.bots?.first(where: { $0.isOrchestrator }) }
-    var onlineCount: Int { musicBots.filter { !$0.isOffline }.count }
-    var liveSessionCount: Int {
-        musicBots.reduce(0) { $0 + ($1.sessions ?? []).filter { $0.isPlaying == true }.count }
-    }
-    var queueDepth: Int { musicBots.reduce(0) { $0 + ($1.queueDepth ?? 0) } }
-    var backupDepth: Int { musicBots.reduce(0) { $0 + ($1.backupQueueDepth ?? 0) } }
-    var guildsServed: Int { musicBots.reduce(0) { $0 + ($1.knownGuildCount ?? 0) } }
-    var audioNodesHealthy: Bool {
-        ["lavalink", "lavalink2", "lavalink3"].contains { dashboard?.nodeHealth?[$0]?.status == "healthy" }
-    }
+    private var summary: FleetSummary { fleetSummary(dashboard: dashboard ?? DashboardResponse(bots: nil, sessions: nil, generatedAt: nil)) }
+    var onlineCount: Int { summary.online }
+    var liveSessionCount: Int { summary.liveSessions }
+    var queueDepth: Int { summary.queueDepth }
+    var backupDepth: Int { summary.backupDepth }
+    var guildsServed: Int { summary.guildsServed }
+    /// Every music bot's voice link is up (Lavalink nodes are gone; bots stream directly).
+    var audioNodesHealthy: Bool { summary.total > 0 && summary.online == summary.total }
 }

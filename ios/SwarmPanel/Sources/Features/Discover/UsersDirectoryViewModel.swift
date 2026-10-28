@@ -10,31 +10,27 @@ final class UsersDirectoryViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var errorMessage: String?
 
-    private let api = APIClient.shared
+    private let core = Core.shared
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            let response: UserSearchResponse = try await api.get(
-                "/api/users/directory",
-                query: ["q": query, "online": onlineOnly ? "1" : nil]
-            )
-            users = response.users ?? []
+            users = try await core.directory(query: query, onlineOnly: onlineOnly).users ?? []
             errorMessage = nil
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Failed to load the directory."
+            errorMessage = error.message("Failed to load the directory.")
         }
     }
 
     func follow(_ accountId: Int, following: Bool) async {
         do {
-            let _: OKResponse = try await api.post("/api/users/\(accountId)/follow", body: FollowBody(following: following))
+            _ = try await core.follow(accountId: accountId, following: following)
             await load()
         } catch {
             guard !error.isCancellation else { return }
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? "Follow failed."
+            errorMessage = error.message("Follow failed.")
         }
     }
 }
