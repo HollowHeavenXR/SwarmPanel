@@ -285,7 +285,7 @@ pub async fn music_intelligence(app: &AppRef, guild_id: Option<&str>, bot_key: O
         tp.push(lim.into());
         let top = app
             .db
-            .all(schema, &format!("SELECT guild_id, title, video_url, play_count, finish_count, skip_count, like_count, dislike_count, {SMART} AS smart_score, updated_at FROM {k}_track_intelligence {where_} ORDER BY smart_score DESC, updated_at DESC LIMIT ${}", tp.len()), &tp)
+            .all(schema, &format!("SELECT guild_id::text AS guild_id, title, video_url, play_count, finish_count, skip_count, like_count, dislike_count, {SMART} AS smart_score, updated_at FROM {k}_track_intelligence {where_} ORDER BY smart_score DESC, updated_at DESC LIMIT ${}", tp.len()), &tp)
             .await;
         let recs = if ex.contains(&format!("{k}_smart_recommendations")) {
             app.db.opt(schema, &format!("SELECT COUNT(*) AS recommendations FROM {k}_smart_recommendations {where_}"), &params).await.and_then(|r| r.i("recommendations")).unwrap_or(0)

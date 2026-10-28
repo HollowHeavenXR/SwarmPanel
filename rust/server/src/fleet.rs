@@ -31,8 +31,6 @@ pub async fn dashboard_payload(app: &AppRef, a: &Auth, enrich: bool) -> Value {
             })
             .collect();
     }
-    let mut flat = Vec::new();
-    let mut seen = std::collections::HashSet::new();
     for b in bots.iter_mut() {
         let key = b.s("key").unwrap_or_default();
         let name = b.s("display_name").unwrap_or_default();
@@ -50,9 +48,6 @@ pub async fn dashboard_payload(app: &AppRef, a: &Auth, enrich: bool) -> Value {
                 s["bot_key"] = json!(key);
                 s["bot_name"] = json!(name);
                 s["bot_display"] = json!(name);
-                if seen.insert(format!("{key}\0{}", s.s("guild_id").unwrap_or_else(|| "0".into()))) {
-                    flat.push(s.clone());
-                }
             }
         }
     }
@@ -94,6 +89,17 @@ pub async fn dashboard_payload(app: &AppRef, a: &Auth, enrich: bool) -> Value {
         b
     }))
     .await;
+    // Flat session list (one per bot+guild), built after enrichment so it carries guild/channel names.
+    let mut flat = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for b in &enriched {
+        let key = b.s("key").unwrap_or_default();
+        for s in b["sessions"].as_array().into_iter().flatten() {
+            if seen.insert(format!("{key}\0{}", s.s("guild_id").unwrap_or_else(|| "0".into()))) {
+                flat.push(s.clone());
+            }
+        }
+    }
     data["bots"] = json!(enriched);
     data["sessions"] = json!(flat);
     data
