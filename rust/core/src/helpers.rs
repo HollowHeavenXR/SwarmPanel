@@ -331,7 +331,7 @@ pub fn bot_featured_session(bot: DashboardBot) -> Option<DashboardSession> {
     all.iter().find(|s| s.is_playing == Some(true)).cloned().or_else(|| all.first().cloned())
 }
 
-#[derive(uniffi::Record, Clone, Debug, Default)]
+#[derive(uniffi::Record, Clone, Debug, Default, PartialEq, serde::Serialize)]
 pub struct FleetSummary {
     pub total: SwiftInt,
     pub online: SwiftInt,
@@ -341,19 +341,30 @@ pub struct FleetSummary {
     pub guilds_served: SwiftInt,
 }
 
+impl Lenient for FleetSummary {
+    /// Derived on decode (DashboardResponse's finish), never read from JSON.
+    fn from_json(_: &Value) -> Option<Self> {
+        Some(FleetSummary::default())
+    }
+}
+
+pub(crate) fn summarize(all: &[DashboardBot]) -> FleetSummary {
+    let bots: Vec<&DashboardBot> = all.iter().filter(|b| b.kind.as_deref() != Some("orchestrator")).collect();
+    let sum = |f: &dyn Fn(&DashboardBot) -> i64| SwiftInt(bots.iter().map(|b| f(b)).sum());
+    FleetSummary {
+        total: SwiftInt(bots.len() as i64),
+        online: SwiftInt(bots.iter().filter(|b| !bot_is_offline((**b).clone())).count() as i64),
+        live_sessions: sum(&|b| b.sessions.as_ref().map(|s| s.iter().filter(|s| s.is_playing == Some(true)).count() as i64).unwrap_or(0)),
+        queue_depth: sum(&|b| b.queue_depth.map(|q| q.0).unwrap_or(0)),
+        backup_depth: sum(&|b| b.backup_queue_depth.map(|q| q.0).unwrap_or(0)),
+        guilds_served: sum(&|b| b.known_guild_count.map(|q| q.0).unwrap_or(0)),
+    }
+}
+
 /// Fleet totals over the music bots (orchestrator excluded).
 #[uniffi::export]
 pub fn fleet_summary(dashboard: DashboardResponse) -> FleetSummary {
-    let bots: Vec<DashboardBot> = dashboard.bots.unwrap_or_default().into_iter().filter(|b| b.kind.as_deref() != Some("orchestrator")).collect();
-    let n = |f: &dyn Fn(&DashboardBot) -> i64| SwiftInt(bots.iter().map(f).sum());
-    FleetSummary {
-        total: SwiftInt(bots.len() as i64),
-        online: SwiftInt(bots.iter().filter(|b| !bot_is_offline((*b).clone())).count() as i64),
-        live_sessions: n(&|b| b.sessions.as_ref().map(|s| s.iter().filter(|s| s.is_playing == Some(true)).count() as i64).unwrap_or(0)),
-        queue_depth: n(&|b| b.queue_depth.map(|q| q.0).unwrap_or(0)),
-        backup_depth: n(&|b| b.backup_queue_depth.map(|q| q.0).unwrap_or(0)),
-        guilds_served: n(&|b| b.known_guild_count.map(|q| q.0).unwrap_or(0)),
-    }
+    summarize(dashboard.bots.as_deref().unwrap_or(&[]))
 }
 
 /// Postgres-style "YYYY-MM-DD HH:MM:SS[.fff][+00]" (UTC) -> unix seconds.

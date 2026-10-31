@@ -17,7 +17,8 @@ model!(SessionPayload {
 model!(OkResponse { ok: bool, message: Option<String> });
 
 // ---- dashboard ---------------------------------------------------------------------------------
-model!(DashboardResponse { bots: Option<Vec<DashboardBot>>, sessions: Option<Vec<DashboardSession>>, generated_at: Option<String> });
+model!(DashboardResponse { bots: Option<Vec<DashboardBot>>, sessions: Option<Vec<DashboardSession>>, generated_at: Option<String>, summary: crate::helpers::FleetSummary }
+    finish(s) { s.summary = crate::helpers::summarize(s.bots.as_deref().unwrap_or(&[])); });
 
 model!(MedicSummary { pending_repairs: Option<I>, pending_infra: Option<I>, critical_health: Option<I>, recoverable_health: Option<I> });
 
@@ -26,6 +27,12 @@ model!(DashboardBot {
     heartbeat_age_seconds: Option<f64>, playback_mode: Option<String>, active_playing_count: Option<I>, known_guild_count: Option<I>,
     queue_depth: Option<I>, backup_queue_depth: Option<I>, sessions: Option<Vec<DashboardSession>>, memory_kb: Option<f64>,
     uptime_seconds: Option<f64>, recent_interaction_count: Option<I>, medic_summary: Option<MedicSummary>,
+    is_offline: bool, is_orchestrator: bool, featured_session: Option<DashboardSession>,
+} finish(s) {
+    s.is_orchestrator = s.kind.as_deref() == Some("orchestrator");
+    s.is_offline = s.status.as_deref().is_some_and(|x| x.eq_ignore_ascii_case("offline")) || s.heartbeat_age_seconds.is_some_and(|a| a > 120.0);
+    let all = s.sessions.as_deref().unwrap_or(&[]);
+    s.featured_session = all.iter().find(|x| x.is_playing == Some(true)).or(all.first()).cloned();
 });
 
 model!(DashboardSession {
@@ -33,8 +40,8 @@ model!(DashboardSession {
     title: Option<String>, video_url: Option<String>, is_playing: Option<bool>, is_paused: Option<bool>, session_state: Option<String>,
     session_state_label: Option<String>, queue_count: Option<I>, backup_queue_count: Option<I>, position_seconds: Option<I>,
     duration_seconds: Option<I>, position_observed_at: Option<String>, thumbnail: Option<String>, media_source_label: Option<String>,
-    cached: Option<bool>, bot_key: Option<String>, bot_display: Option<String>,
-});
+    cached: Option<bool>, bot_key: Option<String>, bot_display: Option<String>, observed_at_unix: Option<f64>,
+} finish(s) { s.observed_at_unix = crate::helpers::observed_at_unix(s.position_observed_at.clone()); });
 
 // ---- bots / inventory / control ----------------------------------------------------------------
 model!(BotsResponse { bots: Option<Vec<BotSummary>>, invite_bots: Option<Vec<InviteBot>> });
@@ -46,7 +53,8 @@ model!(InviteBot {
 model!(BotSummary { key: String, display_name: Option<String>, kind: Option<String> });
 model!(BotInventoryResponse { guilds: Option<Vec<InventoryGuild>> });
 model!(InventoryGuild { id: String, name: Option<String>, channels: Option<Vec<InventoryChannel>>, channels_error: Option<String> });
-model!(InventoryChannel { id: String, name: Option<String>, channel_type as "type": Option<I> });
+model!(InventoryChannel { id: String, name: Option<String>, channel_type as "type": Option<I>, is_voice: bool }
+    finish(s) { s.is_voice = matches!(s.channel_type.map(|t| t.0), Some(2) | Some(13)); });
 
 model!(ControlStateResponse { session: Option<ControlStateSession> });
 model!(ControlStateSession {
@@ -54,7 +62,8 @@ model!(ControlStateSession {
     queue_count: Option<I>, queue_preview: Option<Vec<QueueItem>>, backup_queue_count: Option<I>, home_channel_id: Option<String>,
     channel_id: Option<String>, loop_mode: Option<String>, filter_mode: Option<String>, position_seconds: Option<I>, duration_seconds: Option<I>,
     position_observed_at: Option<String>, volume: Option<I>, pending_direct_orders: Option<I>, latest_direct_order: Option<DirectOrder>,
-});
+    thumbnail_url: Option<String>,
+} finish(s) { s.thumbnail_url = s.video_url.clone().and_then(crate::helpers::youtube_thumbnail); });
 model!(DirectOrder { command: Option<String>, data: Option<String> });
 model!(QueueItem { video_url: String, title: Option<String> });
 model!(SavedQueuesResponse { queues: Option<Vec<SavedQueue>> });
@@ -154,7 +163,8 @@ model!(AccountProfile {
 // ---- admin ---------------------------------------------------------------------------------------
 model!(AuditLogEnvelope { data: AuditLogData });
 model!(AuditLogData { entries: Option<Vec<AuditLogEntry>>, total: Option<I> });
-model!(AuditLogEntry { id: I, actor_username: Option<String>, action: String, target_type: Option<String>, target_id: Option<String>, details: Option<String>, created_at: Option<String> });
+model!(AuditLogEntry { id: I, actor_username: Option<String>, action: String, target_type: Option<String>, target_id: Option<String>, details: Option<String>, created_at: Option<String>, diff: Option<Vec<AuditDiffPair>> }
+    finish(s) { s.diff = crate::helpers::audit_diff_pairs(s.details.clone()); });
 model!(AuditDiffPair { key: String, before: String, after: String });
 
 model!(AlertRulesResponse { rules: Option<Vec<AlertRule>> });

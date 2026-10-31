@@ -45,9 +45,11 @@ typealias ControlAction = ControlActionInfo
 
 extension ControlActionInfo: Identifiable {
     public var id: String { rawValue }
-    static var allCases: [ControlActionInfo] { controlActions() }
+    /// Fetched from the core once; views read it on every render.
+    static let allCases: [ControlActionInfo] = controlActions()
+    private static let byRaw: [String: ControlActionInfo] = Dictionary(uniqueKeysWithValues: allCases.map { ($0.rawValue, $0) })
     static func named(_ raw: String) -> ControlActionInfo {
-        allCases.first { $0.rawValue == raw } ?? ControlActionInfo(rawValue: raw, label: raw.capitalized, needsVoiceChannel: false, needsSourceUrl: false, needsLoopMode: false, needsFilterMode: false)
+        byRaw[raw] ?? ControlActionInfo(rawValue: raw, label: raw.capitalized, needsVoiceChannel: false, needsSourceUrl: false, needsLoopMode: false, needsFilterMode: false)
     }
     static var play: ControlActionInfo { named("PLAY") }
     static var smartRecommend: ControlActionInfo { named("SMART_RECOMMEND") }
@@ -66,18 +68,19 @@ extension DashboardBot: Identifiable {
     public var id: String { key }
     var name: String { displayName ?? key }
     var label: String { displayName?.isEmpty == false ? displayName! : key }
-    var isOrchestrator: Bool { kind == "orchestrator" }
-    var isOffline: Bool { botIsOffline(bot: self) }
-    var featuredSession: DashboardSession? { botFeaturedSession(bot: self) }
+    // isOffline / isOrchestrator / featuredSession are stored fields, filled by the core on decode.
 }
 
 extension DashboardSession: Identifiable {
     public var id: String { (guildId ?? "g") + ":" + (channelId ?? "c") }
 
-    /// Live position (seconds), advancing while playing.
+    /// Live position (seconds), advancing while playing. Plain arithmetic on
+    /// the core's pre-parsed timestamp, so per-second ticks stay on the Swift side.
     func position(at now: Date) -> Double {
-        sessionPosition(positionSeconds: positionSeconds, durationSeconds: durationSeconds, isPlaying: isPlaying,
-                        positionObservedAt: positionObservedAt, nowUnix: now.timeIntervalSince1970)
+        var pos = Double(positionSeconds ?? 0)
+        if isPlaying == true, let observed = observedAtUnix { pos += now.timeIntervalSince1970 - observed }
+        if let duration = durationSeconds, duration > 0 { pos = min(pos, Double(duration)) }
+        return max(0, pos)
     }
 }
 
@@ -95,11 +98,10 @@ extension InventoryGuild: Identifiable {}
 
 extension InventoryChannel: Identifiable {
     var type: Int? { channelType }
-    var isVoice: Bool { isVoiceChannel(channelType: channelType) }
 }
 
 extension ControlStateSession {
-    var derivedThumbnailURL: String? { videoUrl.flatMap { youtubeThumbnail(videoUrl: $0) } }
+    var derivedThumbnailURL: String? { thumbnailUrl }
 }
 
 extension SavedQueue: Identifiable {
@@ -178,7 +180,7 @@ extension PublicProfileSession: Identifiable {
 extension AuditLogEntry: Identifiable {
     /// One row per changed field, or nil when details aren't a before/after diff.
     var diffPairs: [(key: String, before: String, after: String)]? {
-        auditDiffPairs(details: details)?.map { (key: $0.key, before: $0.before, after: $0.after) }
+        diff?.map { (key: $0.key, before: $0.before, after: $0.after) }
     }
 }
 

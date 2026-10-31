@@ -131,8 +131,13 @@ impl LiveSocket {
             "ping" => return Some(json!({ "type": "pong" }).to_string()),
             "snapshot" => {
                 let key = v.get("key").and_then(Value::as_str)?.to_string();
+                let snapshot = decode(&key, v.get("data").unwrap_or(&Value::Null));
+                // Keep the dashboard cache fresh here, so the UI never has to hand it back.
+                if let (LiveSnapshot::Dashboard { value }, Some(i)) = (&snapshot, self.owner.upgrade()) {
+                    crate::helpers::cache_dashboard(&i, value);
+                }
                 let listener = self.state.lock().unwrap().watches.get(&key).map(|w| w.listener.clone())?;
-                listener.on_snapshot(key.clone(), decode(&key, v.get("data").unwrap_or(&Value::Null)));
+                listener.on_snapshot(key.clone(), snapshot);
             }
             "snapshot_error" => {
                 let key = v.get("key").and_then(Value::as_str)?.to_string();

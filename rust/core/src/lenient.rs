@@ -119,7 +119,9 @@ pub fn decode<T: Lenient + Default>(text: &str) -> Result<T, String> {
 /// back to it. `field as "json_key"` maps a renamed field.
 #[macro_export]
 macro_rules! model {
-    ($(#[$m:meta])* $name:ident { $($f:ident $(as $key:literal)? : $t:ty),* $(,)? }) => {
+    // `finish(s) { ... }` runs after decoding, to fill derived fields once
+    // (so the UI never has to call back into Rust while rendering).
+    ($(#[$m:meta])* $name:ident { $($f:ident $(as $key:literal)? : $t:ty),* $(,)? } finish($s:ident) $body:block) => {
         $(#[$m])*
         #[derive(uniffi::Record, Clone, Debug, Default, PartialEq, serde::Serialize)]
         pub struct $name { $( $(#[serde(rename = $key)])? pub $f: $t ),* }
@@ -127,9 +129,15 @@ macro_rules! model {
         impl $crate::lenient::Lenient for $name {
             fn from_json(v: &serde_json::Value) -> Option<Self> {
                 let o = v.as_object()?;
-                Some(Self { $( $f: o.get($crate::model!(@key $f $($key)?)).and_then(<$t as $crate::lenient::Lenient>::from_json).unwrap_or_default() ),* })
+                #[allow(unused_mut)]
+                let mut $s = Self { $( $f: o.get($crate::model!(@key $f $($key)?)).and_then(<$t as $crate::lenient::Lenient>::from_json).unwrap_or_default() ),* };
+                $body
+                Some($s)
             }
         }
+    };
+    ($(#[$m:meta])* $name:ident { $($f:ident $(as $key:literal)? : $t:ty),* $(,)? }) => {
+        $crate::model!($(#[$m])* $name { $($f $(as $key)? : $t),* } finish(_s) {});
     };
     (@key $f:ident $key:literal) => { $key };
     (@key $f:ident) => { stringify!($f) };

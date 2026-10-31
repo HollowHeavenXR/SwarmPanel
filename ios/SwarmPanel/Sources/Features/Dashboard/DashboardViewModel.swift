@@ -29,7 +29,6 @@ final class DashboardViewModel: ObservableObject {
             guard let self, case .success(let snapshot) = result else { return }
             self.response = snapshot
             self.lastUpdatedAt = Date()
-            self.core.saveDashboardCache(dashboard: snapshot)
         }
         socket.connect()
         pollTask = Task { [weak self] in

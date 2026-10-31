@@ -113,14 +113,14 @@ final class TVDashboardModel: ObservableObject {
         // Persist at most every 30s: the live push arrives every couple of
         // seconds and the snapshot only needs to be roughly current for the
         // next launch.
-        core.saveDashboardCache(dashboard: snapshot)
     }
 
     // MARK: - Fleet summary (same totals as the web dashboard's metric strip)
 
     var musicBots: [TVBot] { (dashboard?.bots ?? []).filter { !$0.isOrchestrator } }
     var orchestrator: TVBot? { dashboard?.bots?.first(where: { $0.isOrchestrator }) }
-    private var summary: FleetSummary { fleetSummary(dashboard: dashboard ?? DashboardResponse(bots: nil, sessions: nil, generatedAt: nil)) }
+    /// Computed by the core when the dashboard was decoded.
+    private var summary: FleetSummary { dashboard?.summary ?? FleetSummary(total: 0, online: 0, liveSessions: 0, queueDepth: 0, backupDepth: 0, guildsServed: 0) }
     var onlineCount: Int { summary.online }
     var liveSessionCount: Int { summary.liveSessions }
     var queueDepth: Int { summary.queueDepth }

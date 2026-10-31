@@ -15,19 +15,18 @@ final class FleetTopologyViewModel: ObservableObject {
 
     private let core = Core.shared
 
-    private var dashboard: DashboardResponse { DashboardResponse(bots: bots, sessions: nil, generatedAt: nil) }
-
-    var recoverableSessions: [(bot: DashboardBot, session: DashboardSession)] {
-        findRecoverableSessions(dashboard: dashboard).map { ($0.bot, $0.session) }
-    }
-
-    var overlaps: [GuildOverlap] { fleetOverlaps(dashboard: dashboard) }
+    /// Derived once per load (not per render).
+    @Published private(set) var recoverableSessions: [(bot: DashboardBot, session: DashboardSession)] = []
+    @Published private(set) var overlaps: [GuildOverlap] = []
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            bots = try await core.dashboard().bots ?? []
+            let dashboard = try await core.dashboard()
+            bots = dashboard.bots ?? []
+            overlaps = fleetOverlaps(dashboard: dashboard)
+            recoverableSessions = findRecoverableSessions(dashboard: dashboard).map { ($0.bot, $0.session) }
             errorMessage = nil
         } catch {
             if !error.isCancellation { errorMessage = error.message("Failed to load fleet topology.") }
